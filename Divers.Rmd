@@ -17,3 +17,4 @@ load("~/work/PFE_WildThings/DensityRasterMaps/DensityRasterBrickBear.RData")
 plot(DensityRasterBrick)
 ```
 
+

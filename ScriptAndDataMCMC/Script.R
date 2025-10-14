@@ -1,6 +1,7 @@
 rm(list=ls())
+
 library(nimble) # Bayesien
-library(raster)
+library(raster) # pour lire les maps pixels
 
 home<-getwd() 
 

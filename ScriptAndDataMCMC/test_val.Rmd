@@ -7,7 +7,4 @@ output: html_document
 test=1
 ```
 
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN0YmYtPwIFBeRxDhxnNGZry6IUC2G+58ysKcJMcn8lk valentine.cleach@gmail.com.com
-
-git remote set-url origin git@github.com:valentinecleach/PFE_WildThings.git
-git push origin your-branch
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDykh1pvI4GmNxnCeJJ5DsGwzfV2Govn+FJ5Re9COllx valentine.cleach@gmail.com

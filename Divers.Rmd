@@ -1,0 +1,15 @@
+---
+title: "Divers"
+output: html_document
+---
+
+# Graphiques raster Ours
+```{r}
+library(terra)
+
+load("~/work/PFE_WildThings/DensityRasterMaps/DensityRasterBrickBear.RData")
+
+terra::plot(DensityRasterBrick)
+
+```
+

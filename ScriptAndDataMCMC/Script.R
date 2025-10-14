@@ -1,6 +1,6 @@
 rm(list=ls())
 library(nimble)
-library(raster)
+library(raster) # pour lire les maps pixels
 
 home<-getwd()
 

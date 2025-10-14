@@ -1,8 +1,8 @@
 rm(list=ls())
-library(nimble)
+library(nimble) # Bayesien
 library(raster)
 
-home<-getwd()
+home<-getwd() 
 
 ##########
 ## BEAR ##
@@ -11,16 +11,16 @@ home<-getwd()
 
 
 
-setwd(file.path(home,"ScriptAndDataMCMC/Bear"))
+setwd(file.path(home,"ScriptAndDataMCMC/Bear")) # Selectionnement de l'ours
 
 
 ## LOAD FEMALE DATA
-load("17.F_12_18_INPUTChain1.RData")
+load("17.F_12_18_INPUTChain1.RData") # Importer dans env les choses
 ## LOAD MALE DATA 
 #load("17.M_12_18_INPUTChain1.RData")
 
 ## LOAD THE CUSTOM NIMBLE FUNCTIONS
-source("dbin_LESSCachedAllSparseBear_v2.R")
+source("dbin_LESSCachedAllSparseBear_v2.R") # Import de fonctions
 source("pointProcess.R")
 
 #RUN NIMBLE MODEL (demonstration with single chain and low number of iterations)

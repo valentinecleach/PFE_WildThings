@@ -5,11 +5,15 @@ output: html_document
 
 # Graphiques raster Ours
 ```{r}
-library(terra)
+install.packages("nimble")
+library(nimble)
+library(raster)
+```
 
+
+```{r}
 load("~/work/PFE_WildThings/DensityRasterMaps/DensityRasterBrickBear.RData")
 
-terra::plot(DensityRasterBrick)
-
+plot(DensityRasterBrick)
 ```
 

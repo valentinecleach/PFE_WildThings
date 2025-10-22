@@ -3,7 +3,7 @@ rm(list=ls())
 library(nimble) # Bayesien
 library(raster) # pour lire les maps pixels
 
-home<-getwd() 
+home <- getwd() 
 
 ##########
 ## BEAR ##
@@ -106,11 +106,12 @@ plot(DensityRasterBrick)
 ## WOLVERINE ##
 ###############
 
-
-setwd(file.path(home,"ScriptAndDataMCMC/Wolverine"))
+# To help load without writing whole path (doesn't always work)
+setwd(file.path(home,"ScriptAndDataMCMC/Wolverine")) 
 
 ## LOAD FEMALE DATA
-load("22.J_Fa1.RData")
+load("22.J_Fa1.RData") # Loads not only data but also other stuff
+
 ## LOAD MALE DATA 
 #load("22.J_Ma1.RData")
 
@@ -119,24 +120,42 @@ source("dbin_LESS_Cached_MultipleCovResponse.R")
 source("pointProcess.R")
 
 #RUN NIMBLE MODEL (demonstration with single chain and low number of iterations)
-model <- nimbleModel( code = modelCode
-                      , constants = nimConstants
-                      , data = nimData
-                      , inits = nimInits
-                      , check = FALSE       
-                      , calculate = FALSE)  
-cmodel <- compileNimble(model)
+
+
+model <- nimble::nimbleModel(
+  code = modelCode, 
+  constants = nimConstants, 
+  data = nimData, 
+  inits = nimInits, 
+  check = FALSE, 
+  calculate = FALSE
+  )  
+
+cmodel <- nimble::compileNimble(model)
+
 cmodel$calculate()
-MCMCconf <- configureMCMC(model = model, monitors = c(nimParams),
-                          control = list(reflective = TRUE, adaptScaleOnly = TRUE),
-                          useConjugacy = FALSE) 
-MCMC <- buildMCMC(MCMCconf)
-cMCMC <- compileNimble(MCMC, project = model, resetFunctions = TRUE)
-Runtime <- system.time(myNimbleOutput <- runMCMC( mcmc = cMCMC
-                                                  , nburnin = 0
-                                                  , niter = 100
-                                                  , nchains = 1
-                                                  , samplesAsCodaMCMC = TRUE))
+
+MCMCconf <- nimble::configureMCMC(
+  model = model, 
+  monitors = c(nimParams),
+  control = list(reflective = TRUE, 
+                 adaptScaleOnly = TRUE), 
+  useConjugacy = FALSE) 
+
+
+MCMC <- nimble::buildMCMC(MCMCconf) # okay
+
+cMCMC <- nimble::compileNimble(MCMC, 
+                               project = model, 
+                               resetFunctions = TRUE)
+
+Runtime <- system.time(myNimbleOutput <- nimble::runMCMC( 
+  mcmc = cMCMC, 
+  nburnin = 0, 
+  niter = 100, 
+  nchains = 1, 
+  samplesAsCodaMCMC = TRUE)
+  )
 
 #--PLOT STORED ANNUAL DENSITY RASTERS (average posterior utilization density, see Methods) 
 

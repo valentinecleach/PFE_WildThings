@@ -1,11 +1,11 @@
 ---
-title: "Bear_Explanations"
+title: "Wolverine_Explanations"
 output: html_document
 ---
 
-We have 4 different files to run the model on the bear:
+We have 4 different files to run the model on the Wolverine:
 1 main script to run the model,
-2 INPUTChain1 (One female bears, the other male)
+2 INPUTChain1 (One female Wolverine, the other Wolverine)
 2 files of functions: dbin_LESSCachedAllSparseBear_v2.R, pointProcess.R
 
 ```{r}

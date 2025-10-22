@@ -9,28 +9,31 @@
 #' y[i,1:n.detectors,t] ~ dbern_LESS(p0, sigma, d2[i,1:n.detectors,t], maxDist,  z[i,t]==2)
 
 #### 1.Density function ####
-dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(run = function( x = double(1),
-                                                          sxy = double(1),
-                                                          sigma = double(0),
-                                                          nbDetections = double(0),
-                                                          yDets = double(1),
-                                                          detector.xy = double(2),
-                                                          trials = double(1),
-                                                          detectorIndex = double(2),
-                                                          nDetectorsLESS = double(1),
-                                                          ResizeFactor = double(0, default = 1),
-                                                          maxNBDets = double(0),
-                                                          habitatID = double(2),                    
-                                                          indicator = double(0, default = 1.0),
-                                                          p0State = double(1),
-                                                          detCountries = double(1),
-                                                          detCov = double(2),
-                                                          betaCov = double(1),
-                                                          BetaResponse = double(0),
-                                                          detResponse = double(0),
-                                                          log = integer(0, default = 0)){
+dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
+  run = function( 
+    x = double(1),
+    sxy = double(1),
+    sigma = double(0),
+    nbDetections = double(0),
+    yDets = double(1),
+    detector.xy = double(2),
+    trials = double(1),
+    detectorIndex = double(2),
+    nDetectorsLESS = double(1),
+    ResizeFactor = double(0, default = 1),
+    maxNBDets = double(0),
+    habitatID = double(2),                    
+    indicator = double(0, default = 1.0),
+    p0State = double(1),
+    detCountries = double(1),
+    detCov = double(2),
+    betaCov = double(1),
+    BetaResponse = double(0),
+    detResponse = double(0),
+    log = integer(0, default = 0)
+    ){
    # RETURN TYPE DECLARATION
-   returnType(double(0))
+   returnType(double(0)) #returns a double vector of length 0
    
    ## CHECK INPUT DIMENSIONS
    nDetectors <- length(trials)

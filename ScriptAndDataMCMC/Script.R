@@ -119,23 +119,24 @@ load("22.J_Fa1.RData") # Loads not only data but also other stuff
 source("dbin_LESS_Cached_MultipleCovResponse.R")
 source("pointProcess.R")
 
+print(modelCode)
+
 #RUN NIMBLE MODEL (demonstration with single chain and low number of iterations)
 
-
-model <- nimble::nimbleModel(
+model <- nimble::nimbleModel( # Processes BUGS model code and returns NIMBLE model
   code = modelCode, 
-  constants = nimConstants, 
+  constants = nimConstants, # n.individuals, n.detected, n.years, etc..
   data = nimData, 
-  inits = nimInits, 
+  inits = nimInits, # diff omega, gamma, sigma etc.
   check = FALSE, 
   calculate = FALSE
   )  
 
-cmodel <- nimble::compileNimble(model)
+cmodel <- nimble::compileNimble(model) # Compile a collection of models?
 
 cmodel$calculate()
 
-MCMCconf <- nimble::configureMCMC(
+MCMCconf <- nimble::configureMCMC( # Creates a default MCMC config for model
   model = model, 
   monitors = c(nimParams),
   control = list(reflective = TRUE, 
@@ -143,18 +144,21 @@ MCMCconf <- nimble::configureMCMC(
   useConjugacy = FALSE) 
 
 
-MCMC <- nimble::buildMCMC(MCMCconf) # okay
+MCMC <- nimble::buildMCMC(MCMCconf) # Creates an uncompiled executable MCMC object
 
-cMCMC <- nimble::compileNimble(MCMC, 
-                               project = model, 
-                               resetFunctions = TRUE)
+cMCMC <- nimble::compileNimble(MCMC, # algorithm that samples from model
+                               project = model, # the statistical model (data, priors, likelihood)
+                               resetFunctions = TRUE # 
+                               )
 
-Runtime <- system.time(myNimbleOutput <- nimble::runMCMC( 
-  mcmc = cMCMC, 
-  nburnin = 0, 
-  niter = 100, 
-  nchains = 1, 
-  samplesAsCodaMCMC = TRUE)
+Runtime <- system.time(
+  myNimbleOutput <- nimble::runMCMC( # Runs MCMC
+    mcmc = cMCMC, 
+    nburnin = 0, 
+    niter = 100, 
+    nchains = 1, 
+    samplesAsCodaMCMC = TRUE # coda mcmc returned instead of R matrix of samples
+    )
   )
 
 #--PLOT STORED ANNUAL DENSITY RASTERS (average posterior utilization density, see Methods) 

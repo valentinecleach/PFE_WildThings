@@ -8,7 +8,134 @@ We have 4 different files to run the model on the Wolverine:
 2 INPUTChain1 (One female Wolverine, the other Wolverine)
 2 files of functions: dbin_LESSCachedAllSparseBear_v2.R, pointProcess.R
 
+Model Code
 ```{r}
-
+{
+    dispSigma ~ dunif(0, 10)
+    betaDens ~ dnorm(0, 0.01)
+    # numHabWindows : number of habitat-model observation windows
+    mu[1:numHabWindows] <- exp(betaDens 
+                               * denCounts[1:numHabWindows, 1]
+                               )
+    
+    for (i in 1:n.individuals) {
+        sxy[i, 1:2, 1] ~ dbinomPPSingle( # Function defined in pointProcess 2.3
+          lowerHabCoords[1:numHabWindows, 1:2],
+          upperHabCoords[1:numHabWindows, 1:2], 
+          mu[1:numHabWindows], 
+          1, 
+          numHabWindows)
+    }
+    
+    for (t in 2:n.years) {
+      
+        for (i in 1:n.detected) {
+            sxy[i, 1:2, t] ~ dbinomMNormSourcePPSingle( # Function defined in pointProcess 3.3
+              lowerHabCoords[1:numHabWindows, 1:2], 
+              upperHabCoords[1:numHabWindows, 1:2], 
+              sxy[i, 1:2, t - 1], # precedent
+              dispSigma, 
+              mu[1:numHabWindows], 
+              1, 
+              numHabWindows, 
+              -1)
+        }
+      
+        for (i in n.detected1:n.individuals) {
+            sxy[i, 1:2, t] ~ dbinomPPSingle(
+              lowerHabCoords[1:numHabWindows, 1:2], 
+              upperHabCoords[1:numHabWindows, 1:2], 
+              mu[1:numHabWindows], 
+              1, 
+              numHabWindows)
+        }
+      
+    }
+    
+    omeg1[1:3] ~ nimble::ddirch(alpha[1:3])
+    
+    for (t in 1:n.years1) {
+        gamma[t] ~ dunif(0, 1)
+        w[t] ~ dunif(0, 0.59)
+        h[t] ~ dunif(0, 0.39)
+        phi[t] <- 1 - h[t] - w[t]
+        omega[1, 1, t] <- 1 - gamma[t]
+        omega[1, 2, t] <- gamma[t]
+        omega[1, 3, t] <- 0
+        omega[1, 4, t] <- 0
+        omega[2, 1, t] <- 0
+        omega[2, 2, t] <- phi[t]
+        omega[2, 3, t] <- h[t]
+        omega[2, 4, t] <- w[t]
+        omega[3, 1, t] <- 0
+        omega[3, 2, t] <- 0
+        omega[3, 3, t] <- 0
+        omega[3, 4, t] <- 1
+        omega[4, 1, t] <- 0
+        omega[4, 2, t] <- 0
+        omega[4, 3, t] <- 0
+        omega[4, 4, t] <- 1
+    }
+    
+    for (i in 1:n.individuals) {
+        z[i, 1] ~ dcat(omeg1[1:3])
+        for (t in 1:n.years1) {
+            z[i, t + 1] ~ dcat(omega[z[i, t], 1:4, t])
+        }
+    }
+    
+    sigma ~ dunif(0, 4)
+    
+    for (c in 1:n.covs) {
+        betaCovs[c] ~ dunif(-5, 5)
+    }
+    
+    betaResponse ~ dunif(-5, 5)
+    
+    for (c in 1:n.countries) {
+        for (t in 1:n.years) {
+            p0[c, t] ~ dunif(0, 1)
+        }
+    }
+    
+    for (t in 1:n.years) {
+      
+        for (i in 1:n.individuals) {
+          
+            y.alive[i, 1:nMaxDetectors, t] ~ dbin_LESS_Cached_MultipleCovResponse( # function in file under the same name
+              sxy = sxy[i, 1:2, t], 
+              sigma = sigma, 
+              nbDetections[i, t], 
+              yDets = yDets[i, 1:nMaxDetectors, t], 
+              detector.xy = detector.xy[1:n.detectors, 1:2], 
+              trials = trials[1:n.detectors], 
+              detectorIndex = detectorIndex[1:n.cellsSparse, 
+                                            1:maxNBDets], 
+              nDetectorsLESS = nDetectorsLESS[1:n.cellsSparse], 
+              ResizeFactor = ResizeFactor, 
+              maxNBDets = maxNBDets, 
+              habitatID = habitatIDDet[1:y.maxDet, 1:x.maxDet], 
+              indicator = isAlive[i, t], 
+              p0[1:n.countries, t], 
+              detCountries[1:n.detectors], 
+              detCov = detCovs[1:n.detectors, t, 1:n.covs], 
+              betaCov = betaCovs[1:n.covs], 
+              BetaResponse = betaResponse, 
+              detResponse = detResponse[i, t]
+              )
+          
+            y.dead[i, t] ~ dbern(z[i, t] == 3) # bernouilli distribution
+        }
+    }
+    for (i in 1:n.individuals) {
+        isAlive[i, 1] <- (z[i, 1] == 2)
+        for (t in 1:n.years1) {
+            isAlive[i, t + 1] <- (z[i, t + 1] == 2)
+        }
+    }
+    for (t in 1:n.years) {
+        N[t] <- sum(isAlive[1:n.individuals, t])
+    }
+}
 ```
 

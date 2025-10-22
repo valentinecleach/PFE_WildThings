@@ -17,6 +17,10 @@ setwd(file.path(home,"ScriptAndDataMCMC/Bear")) # Selectionnement de l'ours
 
 ## LOAD FEMALE DATA
 load("17.F_12_18_INPUTChain1.RData") # Importer dans env les choses
+
+
+print(modelCode)
+
 ## LOAD MALE DATA 
 #load("17.M_12_18_INPUTChain1.RData")
 
@@ -36,7 +40,7 @@ cmodel$calculate()
 MCMCconf <- configureMCMC(model = model, monitors = c(nimParams),
                           control = list(reflective = TRUE, adaptScaleOnly = TRUE),
                           useConjugacy = FALSE) 
-MCMC <- buildMCMC(MCMCconf)
+MCMC <- buildMCMC(MCMCconf) ## NE SE LANCE PAS??
 cMCMC <- compileNimble(MCMC, project = model, resetFunctions = TRUE)
 Runtime <- system.time(myNimbleOutput <- runMCMC( mcmc = cMCMC
                                                   , nburnin = 0
@@ -80,7 +84,7 @@ cmodel <- compileNimble(model)
 cmodel$calculate()
 MCMCconf <- configureMCMC(model = model, monitors = c(nimParams),
                           control = list(reflective = TRUE, adaptScaleOnly = TRUE),
-                          useConjugacy = FALSE) 
+                          useConjugacy = FALSE) # ca ca marche oks 
 MCMC <- buildMCMC(MCMCconf)
 cMCMC <- compileNimble(MCMC, project = model, resetFunctions = TRUE)
 Runtime <- system.time(myNimbleOutput <- runMCMC( mcmc = cMCMC
@@ -88,7 +92,7 @@ Runtime <- system.time(myNimbleOutput <- runMCMC( mcmc = cMCMC
                                                   , niter = 100
                                                   , nchains = 1
                                                   , samplesAsCodaMCMC = TRUE))
-
+plot(myNimbleOutput)
 #--PLOT STORED ANNUAL DENSITY RASTERS (average posterior utilization density, see Methods) 
 
 setwd(file.path(home,"DensityRasterMaps"))

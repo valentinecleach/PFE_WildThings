@@ -10,11 +10,22 @@ library(nimble)
 library(raster)
 ```
 
+En vrai dans scripts on a un truc qui se lance bien facile. Ci dessous pas nécéssaire.
+
+Fonction pour nommer les raster qu'on charge:
+```{r}
+load_as <- function(file, newname) {
+  temp_env <- new.env()
+  load(file, envir = temp_env)
+  assign(newname, temp_env[[ls(temp_env)[1]]], envir = .GlobalEnv)
+}
+```
+
 
 ```{r}
-load("~/work/PFE_WildThings/DensityRasterMaps/DensityRasterBrickBear.RData")
-
-plot(DensityRasterBrick)
+load_as("~/work/PFE_WildThings/DensityRasterMaps/DensityRasterBrickBear.RData", 
+        "bear_raster")
+raster::plot(bear_raster)
 ```
 
 

@@ -132,6 +132,12 @@ model <- nimble::nimbleModel( # Processes BUGS model code and returns NIMBLE mod
   calculate = FALSE
   )  
 
+nimParams  
+summary(model$getNodeNames())  # All variables/parameters in model
+# 96498 parameters in model
+
+model$getVarNames()   # Just the variable names
+
 cmodel <- nimble::compileNimble(model) # Compile a collection of models?
 
 cmodel$calculate()

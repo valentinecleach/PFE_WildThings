@@ -9,15 +9,16 @@ We have 4 different files to run the model on the Wolverine:
 2 files of functions: dbin_LESSCachedAllSparseBear_v2.R, pointProcess.R
 
 Model Code
-```{r}
+```{BUGS}
 {
+    # Priors
     dispSigma ~ dunif(0, 10)
     betaDens ~ dnorm(0, 0.01)
-    # numHabWindows : number of habitat-model observation windows
-    mu[1:numHabWindows] <- exp(betaDens 
-                               * denCounts[1:numHabWindows, 1]
-                               )
     
+    # numHabWindows : number of habitat-model observation windows
+    mu[1:numHabWindows] <- exp(betaDens * denCounts[1:numHabWindows, 1] )
+    
+    # Initial activity center (t = 1)
     for (i in 1:n.individuals) {
         sxy[i, 1:2, 1] ~ dbinomPPSingle( # Function defined in pointProcess 2.3
           lowerHabCoords[1:numHabWindows, 1:2],
@@ -25,15 +26,17 @@ Model Code
           mu[1:numHabWindows], 
           1, 
           numHabWindows)
-    }
+    } 
     
+    # Activity centers of following years. (t=2, 3, ...)
     for (t in 2:n.years) {
       
+        # The detected individuals
         for (i in 1:n.detected) {
             sxy[i, 1:2, t] ~ dbinomMNormSourcePPSingle( # Function defined in pointProcess 3.3
               lowerHabCoords[1:numHabWindows, 1:2], 
               upperHabCoords[1:numHabWindows, 1:2], 
-              sxy[i, 1:2, t - 1], # precedent
+              sxy[i, 1:2, t - 1], # depends on last activity center.
               dispSigma, 
               mu[1:numHabWindows], 
               1, 
@@ -41,7 +44,9 @@ Model Code
               -1)
         }
       
-        for (i in n.detected1:n.individuals) {
+       # The non detected individuals
+       for (i in n.detected1:n.individuals) { # i in 1275:2293 
+          # n.detected1 = n.detected + 1 (?...)
             sxy[i, 1:2, t] ~ dbinomPPSingle(
               lowerHabCoords[1:numHabWindows, 1:2], 
               upperHabCoords[1:numHabWindows, 1:2], 
@@ -52,9 +57,11 @@ Model Code
       
     }
     
+    # 
     omeg1[1:3] ~ nimble::ddirch(alpha[1:3])
     
-    for (t in 1:n.years1) {
+    # State transitions
+    for (t in 1:n.years1) { # t in 1:6
         gamma[t] ~ dunif(0, 1)
         w[t] ~ dunif(0, 0.59)
         h[t] ~ dunif(0, 0.39)
@@ -77,32 +84,36 @@ Model Code
         omega[4, 4, t] <- 1
     }
     
-    for (i in 1:n.individuals) {
-        z[i, 1] ~ dcat(omeg1[1:3])
+    # proba to be alive  
+    for (i in 1:n.individuals) { # i in 1:2293
+        z[i, 1] ~ dcat(omeg1[1:3]) # At time 1
         for (t in 1:n.years1) {
-            z[i, t + 1] ~ dcat(omega[z[i, t], 1:4, t])
+            z[i, t + 1] ~ dcat(omega[z[i, t], 1:4, t]) # At times t= 2, 3, ... 
         }
     }
     
-    sigma ~ dunif(0, 4)
+    sigma ~ dunif(0, 4) # width of detection distribution
     
     for (c in 1:n.covs) {
-        betaCovs[c] ~ dunif(-5, 5)
+        betaCovs[c] ~ dunif(-5, 5) # jsp
     }
     
     betaResponse ~ dunif(-5, 5)
     
-    for (c in 1:n.countries) {
-        for (t in 1:n.years) {
-            p0[c, t] ~ dunif(0, 1)
+    for (c in 1:n.countries) { # 8 countries
+        for (t in 1:n.years) { # t in 1:7
+            p0[c, t] ~ dunif(0, 1) # baseline detection probability
         }
     }
     
     for (t in 1:n.years) {
-      
+        
+        # for all individuals
         for (i in 1:n.individuals) {
-          
-            y.alive[i, 1:nMaxDetectors, t] ~ dbin_LESS_Cached_MultipleCovResponse( # function in file under the same name
+            
+          # likelihood of a given individual & spatial binary detection history y[i,1:n.detectors]
+            y.alive[i, 1:nMaxDetectors, t] ~ dbin_LESS_Cached_MultipleCovResponse( 
+              # function in file under the same name
               sxy = sxy[i, 1:2, t], 
               sigma = sigma, 
               nbDetections[i, t], 
@@ -124,7 +135,7 @@ Model Code
               detResponse = detResponse[i, t]
               )
           
-            y.dead[i, t] ~ dbern(z[i, t] == 3) # bernouilli distribution
+            y.dead[i, t] ~ dbern(z[i, t] == 3) # Bernoulli distribution
         }
     }
     for (i in 1:n.individuals) {
@@ -137,5 +148,10 @@ Model Code
         N[t] <- sum(isAlive[1:n.individuals, t])
     }
 }
+```
+
+Les parametres du modèle sont:
+```{r}
+nimParams
 ```
 

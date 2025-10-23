@@ -124,23 +124,24 @@ print(modelCode)
 #RUN NIMBLE MODEL (demonstration with single chain and low number of iterations)
 
 model <- nimble::nimbleModel( # Processes BUGS model code and returns NIMBLE model
-  code = modelCode, 
+  code = modelCode, # Code detailled in Wolverine_Explanations.Rmd
   constants = nimConstants, # n.individuals, n.detected, n.years, etc..
-  data = nimData, 
+  data = nimData, # detection, non detection on diff years + data on habitat etc 
   inits = nimInits, # diff omega, gamma, sigma etc.
   check = FALSE, 
   calculate = FALSE
   )  
 
 nimParams  
+
 summary(model$getNodeNames())  # All variables/parameters in model
 # 96498 parameters in model
 
 model$getVarNames()   # Just the variable names
 
-cmodel <- nimble::compileNimble(model) # Compile a collection of models?
+cmodel <- nimble::compileNimble(model) # Compile the model we created above
 
-cmodel$calculate()
+cmodel$calculate() # -1193130 -> exp(cmodel$calculate) is very small
 
 MCMCconf <- nimble::configureMCMC( # Creates a default MCMC config for model
   model = model, 
@@ -156,13 +157,14 @@ cMCMC <- nimble::compileNimble(MCMC, # algorithm that samples from model
                                project = model, # the statistical model (data, priors, likelihood)
                                resetFunctions = TRUE # 
                                )
+cMCMC$my_initializeModel
 
 Runtime <- system.time(
   myNimbleOutput <- nimble::runMCMC( # Runs MCMC
     mcmc = cMCMC, 
-    nburnin = 0, 
-    niter = 100, 
-    nchains = 1, 
+    nburnin = 0, # no burnin period (to reduce time)
+    niter = 100, # 100 iterations (here low to reduce time)
+    nchains = 1, # Only 1 chaine (to reduce time here too)
     samplesAsCodaMCMC = TRUE # coda mcmc returned instead of R matrix of samples
     )
   )

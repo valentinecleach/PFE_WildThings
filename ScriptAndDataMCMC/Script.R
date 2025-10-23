@@ -161,7 +161,7 @@ cMCMC$my_initializeModel
 
 Runtime <- system.time(
   myNimbleOutput <- nimble::runMCMC( # Runs MCMC
-    mcmc = cMCMC, 
+    mcmc = cMCMC, # compiled nimble model
     nburnin = 0, # no burnin period (to reduce time)
     niter = 100, # 100 iterations (here low to reduce time)
     nchains = 1, # Only 1 chaine (to reduce time here too)

@@ -194,10 +194,12 @@ dbinomPP <- nimbleFunction(
       log = integer(0, default = 0)                # If not 0 then return the log density
    ) {
       # Maximum allowable tolerance for testing to see if points fall on lines (only used when areAreas = 0)
-      tolDist <- 6.661338e-16
+      tolDist <- 6.661338e-16 # Tolerance distance
+      
       ## 2.1.1. Specify the return type dimensionality ----
       # Return type declaration
       returnType(double(0))
+      
       ## 2.1.2. Sanity test the inputs ----
       # Assess the dimensionality of the input coordinates
       dimCoords <- dim(x)[2]
@@ -211,9 +213,9 @@ dbinomPP <- nimbleFunction(
          # binomial process: return a zero likelihood.  This is often not required as in nearly every
          # application of the binomial process these values will be the same but we need to handle the
          # occasional exception
-         if(log) {
+         if(log) { # Ie if log != 0
             return(-Inf)
-         } else {
+         } else { # if log == 0
             return(0.0)
          }
       }

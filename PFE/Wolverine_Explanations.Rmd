@@ -155,3 +155,160 @@ Les parametres du modèle sont:
 nimParams
 ```
 
+## pointProcess 2.3 : dbinomPPSingle 
+
+```{r}
+dbinomPPSingle <- nimbleFunction(
+	run = function(
+		x = double(1),                               # Coordinate values to calculate the density
+		lowerCoords = double(2),                     # The lower coordinate values of the observation windows
+		upperCoords = double(2),                     # The upper coordinate values of the observation windows
+		intensityWeights = double(1, default = 1),   # Values used in the intensity surface (by default a homogeous process is produced)
+		areAreas = double(0, default = 1),           # Flag denoting whether the lower and upper coordinates are areas or transects
+		numWindows = double(0, default = -1),        # Number of observation windows (if negative the number of rows in lowerCoords is used to define this value)
+		log = integer(0, default = 0)                # If not 0 then return the log density
+	) {
+		## 2.3.1. Specify the return type dimensionality ----
+		returnType(double(0))
+		## 2.3.2. Create a temporary input matrix ----
+		temporaryInput <- matrix(x, ncol = length(x), nrow = 1)
+		## 2.3.3. Call the matrix-version of dbinomPP ----
+		return(dbinomPP(temporaryInput, 1, lowerCoords, upperCoords, intensityWeights, areAreas, numWindows, log)) # SEE dbinomPP
+	}
+)
+```
+
+## pointProcess 2.1. dbinomPP
+
+```{r}
+# Define a function for the density function for the (in)homogenous binomial process
+dbinomPP <- nimbleFunction(
+   run = function(
+      x = double(2),                               # Coordinate values to calculate the density
+      numPoints = double(0),                       # The number of points in the binomial process
+      lowerCoords = double(2),                     # The lower coordinate values of the observation windows
+      upperCoords = double(2),                     # The upper coordinate values of the observation windows
+      intensityWeights = double(1, default = 1),   # Values used in the intensity surface (by default a homogeous process is produced)
+      areAreas = double(0, default = 1),           # Flag denoting whether the lower and upper coordinates are areas or transects
+      numWindows = double(0, default = -1),        # Number of observation windows (if negative the number of rows in lowerCoords is used to define this value)
+      log = integer(0, default = 0)                # If not 0 then return the log density
+   ) {
+      # Maximum allowable tolerance for testing to see if points fall on lines (only used when areAreas = 0)
+      tolDist <- 6.661338e-16
+      ## 2.1.1. Specify the return type dimensionality ----
+      # Return type declaration
+      returnType(double(0))
+      ## 2.1.2. Sanity test the inputs ----
+      # Assess the dimensionality of the input coordinates
+      dimCoords <- dim(x)[2]
+      # Ensure that the dimensionality is valid
+      if(dimCoords <= 0) {
+         stop("invalid dimension structure for the input coordinates")
+      }
+      # Ensure that the number of points corresponds to the dimensionality of the input coordinates
+      if(dim(x)[1] < numPoints) {
+         # If the number of rows in the output is less than the number of points simulated by the
+         # binomial process: return a zero likelihood.  This is often not required as in nearly every
+         # application of the binomial process these values will be the same but we need to handle the
+         # occasional exception
+         if(log) {
+            return(-Inf)
+         } else {
+            return(0.0)
+         }
+      }
+      if(numPoints == 0) {
+         # If no points are simulated then the output is certain
+         if(log) {
+            return(0.0)
+         } else {
+            return(1.0)
+         }
+      } else if(numPoints < 0) {
+         # Invalid number of points: set likelihood to zero
+         if(log) {
+            return(-Inf)
+         } else {
+            return(0.0)
+         }
+      }
+      # Assess the number of observation windows
+      numObsWindows <- trunc(numWindows)
+      if(numObsWindows <= 0) {
+         numObsWindows <- dim(lowerCoords)[1]
+      }
+      # Ensure that the number of observation windows is valid
+      if(numObsWindows <= 0) {
+         stop("invalid number of observation windows")
+      }
+      # Check that the number of observation windows is consistent (lower coordinates)
+      if(numObsWindows > dim(lowerCoords)[1]) {
+         stop("number of observation windows not consistent between lower and upper coordinates (or the 'number of windows' parameter)")
+      }
+      # Check that the number of observation windows is consistent (upper coordinates)
+      if(numObsWindows > dim(upperCoords)[1]) {
+         stop("number of observation windows not consistent between lower and upper coordinates (or the 'number of windows' parameter)")
+      }
+      if(dim(lowerCoords)[2] != dimCoords | dim(upperCoords)[2] != dimCoords) {
+         stop("lower and/or upper coordinates have an incorrect dimension structure")
+      }
+      # Calculate the area/length of the observation windows
+      obsWindowSize <- calcObsWindowSize(
+         matrix(lowerCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
+         matrix(upperCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
+         areAreas)
+      # Recycle the intensity weights to match the number of observation windows
+      recIntensityWeights <- numeric(length = numObsWindows, value = intensityWeights, recycle = TRUE)
+      # Ensure that the intensity weights are valid
+      if(sum(recIntensityWeights < 0.0) > 0) {
+         # Invalid values for the intensity weights: set likelihood to zero
+         if(log) {
+            return(-Inf)
+         } else {
+            return(0.0)
+         }
+      }
+      # Find the sum of the product of the intensity weights and area
+      sumIntensity <- sum(recIntensityWeights * obsWindowSize)
+      if(sumIntensity <= 0.0) {
+         # Invalid values for the intensity weights: set likelihood to zero
+         if(log) {
+            return(-Inf)
+         } else {
+            return(0.0)
+         }
+      }
+      ## 2.1.3. Calculate the likelihood of each point ----
+      logPointDens <- rep(0.0, numPoints)
+      for(pointIter in 1:numPoints) {
+         curCoords <- x[pointIter, 1:dimCoords]
+         # Retrieve the observation windows which the point falls within
+         isInObsWindow <- isWithinWindow(curCoords,
+            matrix(lowerCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
+            matrix(upperCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
+            tolDist, areAreas)
+         # Calculate the sum of the intensity
+         pointSumIntensity <- sum(isInObsWindow * recIntensityWeights)
+         if(pointSumIntensity <= 0.0) {
+            if(log) {
+               # Return the log scale density if requested
+               return(-Inf)
+            } else {
+               # Return the natural scale density if requested
+               return(0.0)
+            }
+         }
+         logPointDens[pointIter] <- log(pointSumIntensity)
+      }
+      ## 2.1.4. Return the retrieved density ----
+      outProb <- sum(logPointDens) - numPoints * log(sumIntensity)
+      if(log == 0) {
+         # Export the output probability on the natural scale if requested
+         outProb <- exp(outProb)
+      }
+      return(outProb)
+   }
+)
+```
+
+

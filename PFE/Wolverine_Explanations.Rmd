@@ -155,6 +155,7 @@ Les parametres du modèle sont:
 nimParams
 ```
 
+
 ## pointProcess 2.3 : dbinomPPSingle 
 
 ```{r}
@@ -193,6 +194,9 @@ dbinomPP <- nimbleFunction(
       numWindows = double(0, default = -1),        # Number of observation windows (if negative the number of rows in lowerCoords is used to define this value)
       log = integer(0, default = 0)                # If not 0 then return the log density
    ) {
+     
+     
+     ###  ~~~~ VALIDATION ~~~~
       # Maximum allowable tolerance for testing to see if points fall on lines (only used when areAreas = 0)
       tolDist <- 6.661338e-16 # Tolerance distance
       
@@ -234,6 +238,7 @@ dbinomPP <- nimbleFunction(
             return(0.0)
          }
       }
+      
       # Assess the number of observation windows
       numObsWindows <- trunc(numWindows)
       if(numObsWindows <= 0) {
@@ -254,6 +259,9 @@ dbinomPP <- nimbleFunction(
       if(dim(lowerCoords)[2] != dimCoords | dim(upperCoords)[2] != dimCoords) {
          stop("lower and/or upper coordinates have an incorrect dimension structure")
       }
+      
+      
+      ### ~~~~ Calculates observation windows & intensities ~~~~
       # Calculate the area/length of the observation windows
       obsWindowSize <- calcObsWindowSize(
          matrix(lowerCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
@@ -280,6 +288,8 @@ dbinomPP <- nimbleFunction(
             return(0.0)
          }
       }
+      
+      
       ## 2.1.3. Calculate the likelihood of each point ----
       logPointDens <- rep(0.0, numPoints)
       for(pointIter in 1:numPoints) {
@@ -302,6 +312,8 @@ dbinomPP <- nimbleFunction(
          }
          logPointDens[pointIter] <- log(pointSumIntensity)
       }
+      
+      ### ~~~~ FINAL CALCULATIONS ~~~~
       ## 2.1.4. Return the retrieved density ----
       outProb <- sum(logPointDens) - numPoints * log(sumIntensity)
       if(log == 0) {

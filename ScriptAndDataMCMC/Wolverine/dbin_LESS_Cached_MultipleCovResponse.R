@@ -35,6 +35,7 @@ dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
     
     ## vraisemblance de detection.
     # LESS = Local Evaluation of Spatial Capture-Recapture Space
+    
    # RETURN TYPE DECLARATION
    returnType(double(0)) #returns a double vector of length 0
    

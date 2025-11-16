@@ -63,8 +63,8 @@ Model Code
     # State transitions
     for (t in 1:n.years1) { # t in 1:6
         gamma[t] ~ dunif(0, 1)
-        w[t] ~ dunif(0, 0.59)
-        h[t] ~ dunif(0, 0.39)
+        w[t] ~ dunif(0, 0.59) #  % morts 
+        h[t] ~ dunif(0, 0.39) #  % morts legal.
         phi[t] <- 1 - h[t] - w[t]
         omega[1, 1, t] <- 1 - gamma[t]
         omega[1, 2, t] <- gamma[t]
@@ -114,9 +114,9 @@ Model Code
           # likelihood of a given individual & spatial binary detection history y[i,1:n.detectors]
             y.alive[i, 1:nMaxDetectors, t] ~ dbin_LESS_Cached_MultipleCovResponse( 
               # function in file under the same name
-              sxy = sxy[i, 1:2, t], 
+              sxy = sxy[i, 1:2, t], # coordinates of indiviual i at time t
               sigma = sigma, 
-              nbDetections[i, t], 
+              nbDetections[i, t], # number of detections of i at t 
               yDets = yDets[i, 1:nMaxDetectors, t], 
               detector.xy = detector.xy[1:n.detectors, 1:2], 
               trials = trials[1:n.detectors], 
@@ -127,8 +127,8 @@ Model Code
               maxNBDets = maxNBDets, 
               habitatID = habitatIDDet[1:y.maxDet, 1:x.maxDet], 
               indicator = isAlive[i, t], 
-              p0[1:n.countries, t], 
-              detCountries[1:n.detectors], 
+              p0State = p0[1:n.countries, t], 
+              detCountries = detCountries[1:n.detectors], 
               detCov = detCovs[1:n.detectors, t, 1:n.covs], 
               betaCov = betaCovs[1:n.covs], 
               BetaResponse = betaResponse, 

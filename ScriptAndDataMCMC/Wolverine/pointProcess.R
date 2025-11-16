@@ -554,9 +554,11 @@ dbinomPP <- nimbleFunction(
    ) {
       # Maximum allowable tolerance for testing to see if points fall on lines (only used when areAreas = 0)
       tolDist <- 6.661338e-16
+      
       ## 2.1.1. Specify the return type dimensionality ----
       # Return type declaration
       returnType(double(0))
+      
       ## 2.1.2. Sanity test the inputs ----
       # Assess the dimensionality of the input coordinates
       dimCoords <- dim(x)[2]
@@ -613,11 +615,15 @@ dbinomPP <- nimbleFunction(
       }
       # Calculate the area/length of the observation windows
       obsWindowSize <- calcObsWindowSize(
-         matrix(lowerCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
-         matrix(upperCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
+         matrix(lowerCoords[1:numObsWindows, 1:dimCoords], 
+                nrow = numObsWindows, ncol = dimCoords),
+         matrix(upperCoords[1:numObsWindows, 1:dimCoords], 
+                nrow = numObsWindows, ncol = dimCoords),
          areAreas)
       # Recycle the intensity weights to match the number of observation windows
-      recIntensityWeights <- numeric(length = numObsWindows, value = intensityWeights, recycle = TRUE)
+      recIntensityWeights <- numeric(length = numObsWindows, 
+                                     value = intensityWeights, 
+                                     recycle = TRUE)
       # Ensure that the intensity weights are valid
       if(sum(recIntensityWeights < 0.0) > 0) {
          # Invalid values for the intensity weights: set likelihood to zero
@@ -637,14 +643,17 @@ dbinomPP <- nimbleFunction(
             return(0.0)
          }
       }
+      
       ## 2.1.3. Calculate the likelihood of each point ----
       logPointDens <- rep(0.0, numPoints)
       for(pointIter in 1:numPoints) {
          curCoords <- x[pointIter, 1:dimCoords]
          # Retrieve the observation windows which the point falls within
          isInObsWindow <- isWithinWindow(curCoords,
-            matrix(lowerCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
-            matrix(upperCoords[1:numObsWindows, 1:dimCoords], nrow = numObsWindows, ncol = dimCoords),
+            matrix(lowerCoords[1:numObsWindows, 1:dimCoords], 
+                   nrow = numObsWindows, ncol = dimCoords),
+            matrix(upperCoords[1:numObsWindows, 1:dimCoords], 
+                   nrow = numObsWindows, ncol = dimCoords),
             tolDist, areAreas)
          # Calculate the sum of the intensity
          pointSumIntensity <- sum(isInObsWindow * recIntensityWeights)
@@ -659,6 +668,7 @@ dbinomPP <- nimbleFunction(
          }
          logPointDens[pointIter] <- log(pointSumIntensity)
       }
+      
       ## 2.1.4. Return the retrieved density ----
       outProb <- sum(logPointDens) - numPoints * log(sumIntensity)
       if(log == 0) {

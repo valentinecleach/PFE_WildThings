@@ -32,6 +32,9 @@ dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
     detResponse = double(0),
     log = integer(0, default = 0)
     ){
+    
+    ## vraisemblance de detection.
+    # LESS = Local Evaluation of Spatial Capture-Recapture Space
    # RETURN TYPE DECLARATION
    returnType(double(0)) #returns a double vector of length 0
    
@@ -39,19 +42,22 @@ dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
    nDetectors <- length(trials)
    
    ## SHORTCUT IF INDIVIDUAL IS NOT AVAILABLE FOR DETECTION
-   if(indicator == 0){
-      if(nbDetections == 0){
+   if(indicator == 0){ # animal cannot be detected
+      if(nbDetections == 0){ # No detections
          if(log == 0) return(1.0)
-         else return(0.0)
-      }else{
+         else return(0.0) 
+      }else{ # Detection exist
          if(log == 0) return(0.0)
          else return(-Inf)
       }
    }
    
    ## GET DETECTOR INDEX FROM THE HABITAT ID MATRIX
+   # Map location to habitat grid cell
    sxyID <- habitatID[trunc(sxy[2]/ResizeFactor)+1, trunc(sxy[1]/ResizeFactor)+1]
+   # Get detectors associated with that cell
    index <- detectorIndex[sxyID,1:nDetectorsLESS[sxyID]]
+   # -> index = detectors near the individual
    
    ## GET NECESSARY INFO 
    n.detectors <- length(index)
@@ -59,12 +65,15 @@ dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
    alpha <- -1.0 / (2.0 * sigma * sigma)
    
    ## RECREATE Y 
+   # x = dections for detectors where we had detections
+   # y = number of detectors
    y <- nimNumeric(length = nDetectors, value = 0, init = TRUE)
+   
    if(nbDetections > 0){
       for(j in 1:nbDetections){
-         y[yDets[j]] <- x[j] 
+         y[yDets[j]] <- x[j] # detections
          ## check if a detection is out of the "detection window"
-         if(sum(yDets[j] == index) == 0){
+         if(sum(yDets[j] == index) == 0){ # No detectors in detection
             if(log == 0) return(0.0)
             else return(-Inf)
          } 
@@ -78,18 +87,23 @@ dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
    
    for(j in 1:nDetectors){
       if(index1[count] == j){ # IF J IS EQUAL TO THE RELEVANT DETECTOR 
+        # distance de chaque detector
          d2 <- pow(detector.xy[j,1] - sxy[1], 2) + pow(detector.xy[j,2] - sxy[2], 2)
+         # detection de base
          pZero <- ilogit(logit(p0State[detCountries[j]]) +
+                           # ici covariables pas explicité comme dans Wolf ou Bear
                             sum(betaCov[1:n.covs] * detCov[j,1:n.covs]) +
                             BetaResponse*detResponse)
+         # on calcule la proba avec proba de detection de base + distance
          p <- pZero * exp(alpha * d2)
+         # on calcule la log vraisemblance
          logProb <- logProb + dbinom(y[j], prob = p, size = trials[j], log = TRUE)
          count <- count + 1
       }
    }
    
-   if(log)return(logProb)
-   return(exp(logProb))
+   if(log)return(logProb) # if log == 1
+   return(exp(logProb)) # on fait exp(log-vraisemblance))
 })
 
 

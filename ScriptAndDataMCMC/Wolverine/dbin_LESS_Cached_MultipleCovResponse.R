@@ -55,6 +55,7 @@ dbin_LESS_Cached_MultipleCovResponse <- nimbleFunction(
    
    ## GET DETECTOR INDEX FROM THE HABITAT ID MATRIX
    # Map location to habitat grid cell
+   # ResizeFactor=3
    sxyID <- habitatID[trunc(sxy[2]/ResizeFactor)+1, trunc(sxy[1]/ResizeFactor)+1]
    # Get detectors associated with that cell
    index <- detectorIndex[sxyID,1:nDetectorsLESS[sxyID]]

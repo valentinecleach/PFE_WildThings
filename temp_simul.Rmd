@@ -1,0 +1,78 @@
+# Temporal Simulation
+
+---
+title: "Temporal Simulation"
+output: pdf_document
+date: "2026-02-02"
+---
+
+## Libraries & Packages
+```{r}
+library(gtools)
+```
+
+## Simulation étape par étape
+
+Imaginons que nous souhaitons modéliser les différents changements d'états sur 5 années consécutives.
+
+```{r}
+n.years1 <- 5 # 5 ans
+alpha <- c(1, 1, 1) # équiprobabilité des 3 états initiaux
+omeg1 <- rdirichlet(1, alpha)[1, ]
+```
+
+Maintenant, il faut calculer une probabilité d'évolution d'un état à un autre pour chaque animal. On a donc besoin de 6 réalisations de chaque loi de probabilité utilisée.
+
+```{r}
+gamma <- numeric(n.years1)
+w <- numeric(n.years1)
+h <- numeric(n.years1)
+phi <- numeric(n.years1) # 6 zéros pour stocker les réalisations
+
+omega <- array(0, dim = c(4, 4, n.years1)) # 4 états possibles
+```
+Plus qu'à générer ces réalisations. Cela est obtenu grâce à une boucle qui "parcourt" le temps :
+
+```{r}
+for (t in 1:n.years1) {
+  
+  gamma[t] <- runif(1, 0, 1)
+  w[t] <- runif(1, 0, 0.59)
+  h[t] <- runif(1, 0, 0.39)
+  phi[t] <- 1 - h[t] - w[t]
+  
+  omega[1, , t] <- c(1 - gamma[t], gamma[t], 0, 0)
+  omega[2, , t] <- c(0, phi[t], h[t], w[t])
+  omega[3, , t] <- c(0, 0, 0, 1)
+  omega[4, , t] <- c(0, 0, 0, 1)
+}
+```
+
+Pour chaque état à un temps donné, on a 
+```{r}
+omega
+```
+Cette simulation correspond à celle pour un seul individu sur 6 ans.\
+Maintenant, on souhaite simuler une population consituée de 10 indivius.
+
+```{r}
+N0 <- 100 # 
+state <- sample(1:4, N0, replace = TRUE) # repartition initiale
+```
+
+```{r}
+pop <- matrix(0, nrow = n.years1 + 1, ncol = 4)
+
+## population initiale
+pop[1, ] <- c(50, 50, 0, 0)  # ex : tous en état 1
+
+for (t in 1:n.years1) {
+  for (states in 1:4) {
+    pop[t + 1, ] <- pop[t + 1, ] +
+      rmultinom(1, pop[t, states], omega[states, , t])
+  }
+}
+
+pop
+```
+

@@ -1,16 +1,14 @@
+# Importations
 
-####### Time Simulations ######
-
+library(necountries)
+library(sf); library(dplyr)
+library(ggplot2)
 
 ###### Spatial Simulation #####
 
 coord_test <- rbinomPPSingle(n=1,
                lowerCoords = nimData$lowerHabCoords,
                upperCoords = nimData$upperHabCoords)
-
-library(necountries)
-library(sf); library(dplyr)
-library(ggplot2)
 
 # Charger les pays
 zone <- countries(c("Sweden", "Norway")) %>%

@@ -1,0 +1,12 @@
+---
+title: "StraussProcess"
+output: pdf_document
+---
+
+```{r}
+library(spatstat)
+
+?Strauss
+?rStrauss() 
+```
+

@@ -104,16 +104,35 @@ rbinomMNormSourcePPSingle_inside_zone <- function(
 
 zone_union <- st_union(zone)  # merge Sweden + Norway
 
-individu_t1 <- rbinomPPSingle_inside_zone(
-  LowerHabCoords_fix,
-  UpperHabCoords_fix,
-  zone_union)
+sxy <- array(NA,
+      dim = c(nimConstants$n.individuals,
+              nimConstants$n.years,
+              2))
+# sxy dim : [i , t , coord]
 
-individu_t2 <- rbinomMNormSourcePPSingle_inside_zone(
-  lower = LowerHabCoords_fix,
-  upper = UpperHabCoords_fix,
-  sourceCoords = individu_t1,
-  polygon = zone_union)
+sxy <- array(NA,
+             dim = c(nimConstants$n.individuals,
+                     nimConstants$n.years,
+                     2))
+
+for (j in 1:nimConstants$n.individuals){
+  
+  # Year 1: initial activity center
+  sxy[j, 1, ] <- rbinomPPSingle_inside_zone(
+    lower = LowerHabCoords_fix,
+    upper = UpperHabCoords_fix,
+    polygon = zone_union)
+  
+  # Movement through years
+  for (i in 2:nimConstants$n.years){
+    
+    sxy[j, i, ] <- rbinomMNormSourcePPSingle_inside_zone(
+      lower = LowerHabCoords_fix,
+      upper = UpperHabCoords_fix,
+      sourceCoords = sxy[j, i-1, ],
+      polygon = zone_union)
+  }
+}
 
 zone %>%
   ggplot()+
@@ -125,9 +144,3 @@ zone %>%
                  y=individu_t2[2],
                  col="temps2"))+
   theme_bw()
-
-
-filter(!is.na(nimData$sxy))
-View(nimData$sxy)
-View(as.data.frame(nimData$sxy))
-View(as.data.frame(nimInits$sxy))

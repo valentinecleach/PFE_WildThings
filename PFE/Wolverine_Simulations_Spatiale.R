@@ -137,10 +137,26 @@ for (j in 1:nimConstants$n.individuals){
 zone %>%
   ggplot()+
   geom_sf()+
-  geom_point(aes(x=individu_t1[1],
-                 y=individu_t1[2],
-                 col="temps1"))+
-  geom_point(aes(x=individu_t2[1],
-                 y=individu_t2[2],
-                 col="temps2"))+
+  geom_point(aes(x=sxy[1,1,1],
+                 y=sxy[1,1,2],# [i , t , coord]
+                 col="year1"))+
+  geom_point(aes(x=sxy[1,2,1],
+                 y=sxy[1,2,2],
+                 col="year2"))+
+  geom_point(aes(x=sxy[1,3,1],
+                 y=sxy[1,3,2],
+                 col="year3"))+
+  geom_point(aes(x=sxy[1,4,1],
+                 y=sxy[1,4,2],
+                 col="year4"))+
+  geom_point(aes(x=sxy[1,5,1],
+                 y=sxy[1,5,2],
+                 col="year5"))+
+  geom_point(aes(x=sxy[1,6,1],
+                 y=sxy[1,6,2],
+                 col="year6"))+
+  geom_point(aes(x=sxy[1,7,1],
+                 y=sxy[1,7,2],
+                 col="year7"))+
+  labs(title = "Individu1")+
   theme_bw()

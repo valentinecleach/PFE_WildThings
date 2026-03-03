@@ -1,0 +1,34 @@
+---
+title: "Simul_Base"
+output: pdf_document
+---
+
+# nimConstants
+```{r}
+simul.nimConstants = list(n.individuals = 1000, 
+                           n.detected = 749,
+                           n.detected1 = 750,
+                           n.detectors = 6457,
+                           n.years = 7,
+                           n.years1 = 6,
+                           n.covs = 3,
+                           numHabWindows = 1802,
+                           n.countries = 8,
+                           y.maxDet = 25,
+                           x.maxDet = 21,
+                           ResizeFactor = 3,
+                           n.cellsSparse = 244,
+                           maxNBDets = 180,
+                           nMaxDetectors = 6)
+```
+
+# nimInits
+```{r}
+
+```
+
+# nimData
+```{r}
+
+```
+

@@ -61,7 +61,7 @@ state <- sample(1:4, N0, replace = TRUE) # repartition initiale
 ```
 
 ```{r}
-pop <- matrix(0, nrow = n.years1 + 1, ncol = 4)
+pop <- matrix(0, nrow = n.years, ncol = 4)
 
 ## population initiale
 pop[1, ] <- c(50, 50, 0, 0)  # ex : tous en état 1

@@ -8,6 +8,12 @@ library(necountries)
 library(sf)
 library(dplyr)
 library(ggplot2)
+library(gtools)
+```
+
+
+```{r}
+
 ```
 
 # nimConstants
@@ -55,7 +61,244 @@ simul.nimInits <- list(
 ```
 
 # nimData
+
+## Temporalité 
+
+### changement d'états
 ```{r}
+# création de trucs vides pour stocker nos variables
+gamma <- numeric(simul.nimConstants$n.years1)
+w <- numeric(simul.nimConstants$n.years1)
+h <- numeric(simul.nimConstants$n.years1)
+phi <- numeric(simul.nimConstants$n.years1) # 6 zéros pour stocker les réalisations
+omega <- array(0, 
+               dim = c(4, 4, simul.nimConstants$n.years1)) # 4 états possibles
+
+# mise a jour / calculation de nos probas
+for (t in 1:simul.nimConstants$n.years1) {
+  # calcule des probas de transitions
+  gamma[t] <- runif(1, 0, 1)
+  w[t] <- runif(1, 0, 0.59)
+  h[t] <- runif(1, 0, 0.39)
+  phi[t] <- 1 - h[t] - w[t]
+  
+  # calcul des probas de chaque état
+  omega[1, , t] <- c(1 - gamma[t], gamma[t], 0, 0)
+  omega[2, , t] <- c(0, phi[t], h[t], w[t])
+  omega[3, , t] <- c(0, 0, 0, 1)
+  omega[4, , t] <- c(0, 0, 0, 1)
+}
+```
+
+### z matrice etats pour individus
+Matrice de l'état de nos individus a chaque étape
+```{r}
+# State matrix (individual x year)
+z <- matrix(NA, 
+            nrow = simul.nimConstants$n.individuals, 
+            ncol = simul.nimConstants$n.years)
+
+# ---- Etat initial ----
+z[,1] <- c(rep(1, simul.nimConstants$n.individuals/2),
+           rep(2, simul.nimConstants$n.individuals/2))
+
+# ---- Etats après ----
+for (t in 1:(simul.nimConstants$n.years - 1)) {
+  for (i in 1:simul.nimConstants$n.individuals) {
+    
+    current_state <- z[i, t]
+    
+    # Draw next state from transition probabilities
+    z[i, t + 1] <- sample(1:4, 
+                          size = 1, 
+                          prob = omega[current_state, , t])
+  }
+}
+```
+
+### isAlive
+Matrice binaire : vivant ou non.
+```{r}
+isAlive <- ifelse(z==2, 1, 0)
+```
+
+### sxy
+```{r}
+coord_test <- rbinomPPSingle(n=1,
+               lowerCoords = nimData$lowerHabCoords,
+               upperCoords = nimData$upperHabCoords)
+
+# Charger les pays
+zone <- countries(c("Sweden", "Norway")) %>%
+  st_as_sf()
+zone_buff <- zone %>%
+  st_buffer(dist=2.5)
+
+hab_windows <- data.frame(
+  x_low = nimData$lowerHabCoords[, "x"],
+  y_low = nimData$lowerHabCoords[, "y"],
+  x_up  = nimData$upperHabCoords[, "x"],
+  y_up  = nimData$upperHabCoords[, "y"]
+)
+
+hab_centroids <- hab_windows %>%
+  mutate(
+    x = (x_low + x_up) / 2,
+    y = (y_low + y_up) / 2
+  ) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(zone))
+
+keep <- st_intersects(hab_centroids, zone_buff, sparse = FALSE)[,1]
+hab_windows_fix <- hab_windows[keep, ]
+
+LowerHabCoords_fix <- as.matrix(
+  hab_windows_fix[, c("x_low", "y_low")]
+)
+UpperHabCoords_fix <- as.matrix(
+  hab_windows_fix[, c("x_up", "y_up")]
+)
+
+# On prends des pts qui tombent dans notre zone
+rbinomPPSingle_inside_zone <- function(
+    lower, 
+    upper, 
+    polygon, 
+    max_iter = 1000
+    ){
+  
+  for (i in 1:max_iter) {
+    # On simule un point
+    pt <- rbinomPPSingle( 
+      n=1,
+      lowerCoords = lower,
+      upperCoords = upper
+      )
+    # On regarde s'il tombe dans la zone
+    pt_sf <- st_as_sf(
+      data.frame(x=pt[1], y=pt[2]),
+      coords = c("x","y"),
+      crs = st_crs(polygon)
+      )
+    if (st_within(pt_sf, polygon, sparse = FALSE)[1,1]) {
+      return(pt)
+    }
+  }
+  stop("Could not sample inside polygon")
+}
+
+# Meme chose
+rbinomMNormSourcePPSingle_inside_zone <- function(
+    lower, 
+    upper, 
+    polygon, 
+    sourceCoords,
+    max_iter = 1000) {
+  
+  for (i in 1:max_iter) {
+    pt <- rbinomMNormSourcePPSingle(
+      n=1,
+      lowerCoords = lower,
+      upperCoords = upper,
+      sourceCoords = sourceCoords,
+      normSD = 1)
+    pt_sf <- st_as_sf(data.frame(x=pt[1], y=pt[2]),
+                      coords = c("x","y"),
+                      crs = st_crs(polygon))
+    if (st_within(pt_sf, polygon, sparse = FALSE)[1,1]) {
+      return(pt)
+    }
+  }
+  stop("Could not sample inside polygon")
+}
+
+zone_union <- st_union(zone)  # merge Sweden + Norway
+
+sxy <- array(NA,
+      dim = c(nimConstants$n.individuals,
+              nimConstants$n.years,
+              2))
+# sxy dim : [i , t , coord]
+
+sxy <- array(NA,
+             dim = c(nimConstants$n.individuals,
+                     nimConstants$n.years,
+                     2))
+
+for (j in 1:nimConstants$n.individuals){
+  
+  # Year 1: initial activity center
+  sxy[j, 1, ] <- rbinomPPSingle_inside_zone(
+    lower = LowerHabCoords_fix,
+    upper = UpperHabCoords_fix,
+    polygon = zone_union)
+  
+  # Movement through years
+  for (i in 2:nimConstants$n.years){
+    
+    sxy[j, i, ] <- rbinomMNormSourcePPSingle_inside_zone(
+      lower = LowerHabCoords_fix,
+      upper = UpperHabCoords_fix,
+      sourceCoords = sxy[j, i-1, ],
+      polygon = zone_union)
+  }
+}
 
 ```
+
+
+## Regroupement de tout
+```{r}
+simul.nimData <- list(
+  z = z,
+  y.alive = ,
+  y.dead = ,
+  LowerHabCoords = nimData$lowerHabCoords,
+  upperHabCoords = nimData$upperHabCoords,
+  detCountries = nimData$detCountries,
+  detCovs = nimData$detCovs,
+  detResponse = ,
+  denCounts = ,
+  trials = ,
+  alpha = ,
+  detector.xy = ,
+  sxy = ,
+  detectorIndex = ,
+  nDetectorsLESS = , 
+  habitatIDDet = ,
+  yDets = ,
+  nbDetections = 
+)
+```
+
+## brouillon
+```{r}
+state <- sample(1:4, 
+                simul.nimConstants$n.individuals, 
+                replace = TRUE) # repartition initiale
+pop <- matrix(0, nrow = simul.nimConstants$n.years, ncol = 4)
+
+## population initiale
+pop[1, ] <- c(
+  simul.nimConstants$n.individuals/2, 
+  simul.nimConstants$n.individuals/2, 
+  0, 0)  # ex : tous en état 1
+
+for (t in 1:simul.nimConstants$n.years1) {
+  for (states in 1:4) {
+    pop[t + 1, ] <- pop[t + 1, ] +
+      rmultinom(1, pop[t, states], omega[states, , t])
+  }
+}
+```
+
+
+```{r}
+head(nimData$y.alive);head(nimData$z)
+str(nimData$y.alive)
+dim(nimData$y.alive)
+head(nimData$y.alive)
+nimData$y.alive[1,,]
+```
+-> y.alive de dimension [individu x detector x year]
+
 

@@ -35,7 +35,6 @@ Plus qu'à générer ces réalisations. Cela est obtenu grâce à une boucle qui
 
 ```{r}
 for (t in 1:n.years1) {
-  
   gamma[t] <- runif(1, 0, 1)
   w[t] <- runif(1, 0, 0.59)
   h[t] <- runif(1, 0, 0.39)
@@ -74,5 +73,38 @@ for (t in 1:n.years1) {
 }
 
 pop
+```
+
+
+Simulation avec agrégation entre les individus
+
+```{r}
+library(spatstat.random)
+library(spatstat.geom)
+```
+
+```{r}
+# Fenêtre d'étude
+win <- owin(c(0, 100), c(0, 100))
+
+# Paramètres
+kappa <- 0.05   # intensité des centres
+mu <- 10        # taille moyenne des clusters
+sigma <- 5      # dispersion intra-cluster
+
+# Simulation Neyman-Scott (Thomas process)
+X <- rNeymanScott(
+  kappa = 0.05,
+  rcluster = function(x0, y0, n) {
+    cbind(
+      rnorm(n, mean = x0, sd = sigma),
+      rnorm(n, mean = y0, sd = sigma)
+    )
+  },
+  mu = mu,
+  win = win
+)
+
+plot(X, main="Processus de Neyman-Scott (Thomas)")
 ```
 

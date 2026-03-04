@@ -124,39 +124,9 @@ isAlive <- ifelse(z==2, 1, 0)
 
 ### sxy
 ```{r}
-coord_test <- rbinomPPSingle(n=1,
-               lowerCoords = nimData$lowerHabCoords,
-               upperCoords = nimData$upperHabCoords)
-
 # Charger les pays
 zone <- countries(c("Sweden", "Norway")) %>%
   st_as_sf()
-zone_buff <- zone %>%
-  st_buffer(dist=2.5)
-
-hab_windows <- data.frame(
-  x_low = nimData$lowerHabCoords[, "x"],
-  y_low = nimData$lowerHabCoords[, "y"],
-  x_up  = nimData$upperHabCoords[, "x"],
-  y_up  = nimData$upperHabCoords[, "y"]
-)
-
-hab_centroids <- hab_windows %>%
-  mutate(
-    x = (x_low + x_up) / 2,
-    y = (y_low + y_up) / 2
-  ) %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(zone))
-
-keep <- st_intersects(hab_centroids, zone_buff, sparse = FALSE)[,1]
-hab_windows_fix <- hab_windows[keep, ]
-
-LowerHabCoords_fix <- as.matrix(
-  hab_windows_fix[, c("x_low", "y_low")]
-)
-UpperHabCoords_fix <- as.matrix(
-  hab_windows_fix[, c("x_up", "y_up")]
-)
 
 # On prends des pts qui tombent dans notre zone
 rbinomPPSingle_inside_zone <- function(
@@ -244,6 +214,45 @@ for (j in 1:nimConstants$n.individuals){
 }
 
 ```
+# Correction chat a corriger.
+```{r}
+sxy <- array(NA,
+             dim = c(nimConstants$n.individuals,
+                     nimConstants$n.years,
+                     2))
+
+for (j in 1:nimConstants$n.individuals) {
+  
+  alive_years <- which(isAlive[j, ] == 1)
+  
+  if (length(alive_years) == 0) next  # never alive
+  
+  first_year <- min(alive_years)
+  
+  # ---- Initial AC at first alive year ----
+  sxy[j, first_year, ] <- rbinomPPSingle_inside_zone(
+    lower = LowerHabCoords_fix,
+    upper = UpperHabCoords_fix,
+    polygon = zone_union)
+  
+  # ---- Movement while alive ----
+  for (t in (first_year + 1):nimConstants$n.years) {
+    
+    if (isAlive[j, t] == 1) {
+      
+      sxy[j, t, ] <- rbinomMNormSourcePPSingle_inside_zone(
+        lower = LowerHabCoords_fix,
+        upper = UpperHabCoords_fix,
+        sourceCoords = sxy[j, t - 1, ],
+        polygon = zone_union)
+      
+    } else {
+      break  # stop movement once dead
+    }
+  }
+}
+```
+
 
 
 ## Regroupement de tout

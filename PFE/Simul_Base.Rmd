@@ -287,22 +287,22 @@ table(simul.y.alive[4, , ])
 ```{r}
 simul.nimData <- list(
   z = z,
-  y.alive = ,
-  y.dead = ,
+  y.alive = simul.y.alive,
+  y.dead = , # Facile
   LowerHabCoords = nimData$lowerHabCoords,
   upperHabCoords = nimData$upperHabCoords,
   detCountries = nimData$detCountries,
   detCovs = nimData$detCovs,
-  detResponse = ,
-  denCounts = ,
-  trials = ,
-  alpha = ,
-  detector.xy = ,
+  detResponse = , # Jsp ce que c'est
+  denCounts = nimData$denCounts,
+  trials = nimData$trials, # 
+  alpha = c(1,1,1),
+  detector.xy = nimData$detector.xy,
   sxy = sxy,
-  detectorIndex = ,
-  nDetectorsLESS = , 
-  habitatIDDet = ,
-  yDets = ,
+  detectorIndex = nimData$detectorIndex,
+  nDetectorsLESS = nimData$nDetectorsLESS, 
+  habitatIDDet = nimData$habitatIDDet,
+  yDets = nimData$yDets,
   nbDetections = 
 )
 ```

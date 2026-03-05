@@ -25,6 +25,8 @@ X <- rThomas(kappa = kappa,
              mu = mu,
              sigma = sigma)
 
+X$x
+
 # Affichage
 plot(X, main="Processus de Thomas (Neyman-Scott)")
 ```

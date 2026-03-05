@@ -12,16 +12,25 @@ lambda_offspring <- 15       # Nombre moyen d'individus par cluster
 sigma_cluster <- 5           # Rayon du cluster (Neyman-Scott)
 
 # --- Étape 1 : Création de la population initiale (Année 1) ---
-parents_x <- runif(n_parents, area_ext[1], area_ext[2])
-parents_y <- runif(n_parents, area_ext[3], area_ext[4])
+parents_x <- runif(n=n_parents, 
+                   min=area_ext[1], 
+                   max=area_ext[2])
+parents_y <- runif(n=n_parents, 
+                   min=area_ext[3], 
+                   max=area_ext[4])
 
 pop_list <- list()
 # Simulation Neyman-Scott
 for(p in 1:n_parents){
-  n_ind <- rpois(1, lambda_offspring)
+  n_ind <- rpois(n=1, 
+                 lambda=lambda_offspring)
   # Les enfants sont distribués autour des parents (Processus de Thomas)
-  x <- rnorm(n_ind, parents_x[p], sigma_cluster)
-  y <- rnorm(n_ind, parents_y[p], sigma_cluster)
+  x <- rnorm(n=n_ind, 
+             mean=parents_x[p], 
+             sd=sigma_cluster)
+  y <- rnorm(n=n_ind, 
+             mean=parents_y[p], 
+             sd=sigma_cluster)
   pop_list[[p]] <- data.frame(id = paste0("p", p, "_i", 1:n_ind), 
                               x = x, y = y, year = 1, alive = 1)
 }
@@ -54,7 +63,8 @@ full_pop$y <- pmax(area_ext[3], pmin(area_ext[4], full_pop$y))
 
 
 # Supposons une grille de pièges (detectors)
-traps <- expand.grid(x = seq(10, 90, by=10), y = seq(10, 90, by=10))
+traps <- expand.grid(x = seq(10, 90, by=10), 
+                     y = seq(10, 90, by=10))
 sigma_det <- 3  # Rayon de détection de l'animal
 p0 <- 0.2        # Probabilité de détection de base
 
@@ -65,10 +75,16 @@ for(i in 1:nrow(full_pop)) {
     # Distance aux pièges
     dists <- sqrt((full_pop$x[i] - traps$x)^2 + (full_pop$y[i] - traps$y)^2)
     prob <- p0 * exp(-dists^2 / (2 * sigma_det^2))
-    det_count <- rbinom(nrow(traps), 1, prob)
+    det_count <- rbinom(n=nrow(traps), 
+                        size=1, 
+                        prob=prob)
     if(sum(det_count) > 0) {
-      detections[[length(detections)+1]] <- data.frame(id=full_pop$id[i], year=full_pop$year[i], trap=which(det_count>0))
+      detections[[length(detections)+1]] <- data.frame(
+        id=full_pop$id[i], 
+        year=full_pop$year[i], 
+        trap=which(det_count>0))
     }
   }
 }
+
 obs_data <- do.call(rbind, detections)

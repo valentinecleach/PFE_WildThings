@@ -37,21 +37,22 @@ simul.nimInits <- list(
               dim = c(simul.nimConstants$n.individuals,
                       simul.nimConstants$n.years,
                       2)),
+  # jsp
   dispSigma = 3,
   z = matrix(NA,
              ncol=simul.nimConstants$n.years,
              nrow=simul.nimConstants$n.individuals),
-  omeg1 = c(0.5, 0.25, 0.25),
-  gamma = c(0,0,0,0,0,0),
-  p0 = matrix(NA,
-              ncol=(simul.nimConstants$n.years+1),
-              nrow=simul.nimConstants$n.years),
+  # a changer -> quand mettre z=1?
+  omeg1 = nimInits$omeg1,
+  gamma = nimInits$gamma,
+  p0 = nimInits$p0,
+  # p0 = matrix(NA,ncol=(simul.nimConstants$n.years+1),nrow=simul.nimConstants$n.years),
   sigma = 1.71,
-  betaDens = 0.0361, # A choisir
-  betaCovs = c(0.0712, 0.0813, 0.0592),
+  betaDens = 0.03, # round
+  betaCovs = c(0.07, 0.08, 0.06), # round de truc de base.
   betaResponse = -0.0386,
-  h = c(0,0,0,0,0,0),
-  w= c(0,0,0,0,0,0)
+  h = nimInits$h,
+  w = nimInits$w
 )
 ```
 
@@ -83,6 +84,9 @@ for (t in 1:simul.nimConstants$n.years1) {
   omega[3, , t] <- c(0, 0, 0, 1)
   omega[4, , t] <- c(0, 0, 0, 1)
 }
+
+nimData$sxy[5,1,]
+which(!is.na(nimData$sxy))
 ```
 
 ### z matrice etats pour individus
@@ -281,28 +285,29 @@ for (i in 1:simul.nimConstants$n.individuals) {
 
 View(simul.y.alive)
 table(simul.y.alive[4, , ])
+sxy[1,,1]
 ```
 
 ## Regroupement de tout
 ```{r}
 simul.nimData <- list(
   z = z,
-  y.alive = ,
-  y.dead = ,
+  y.alive = simul.y.alive,
+  y.dead = , # Facile
   LowerHabCoords = nimData$lowerHabCoords,
   upperHabCoords = nimData$upperHabCoords,
   detCountries = nimData$detCountries,
   detCovs = nimData$detCovs,
-  detResponse = ,
-  denCounts = ,
-  trials = ,
-  alpha = ,
-  detector.xy = ,
+  detResponse = , # Jsp ce que c'est
+  denCounts = nimData$denCounts,
+  trials = nimData$trials, # 
+  alpha = c(1,1,1),
+  detector.xy = nimData$detector.xy,
   sxy = sxy,
-  detectorIndex = ,
-  nDetectorsLESS = , 
-  habitatIDDet = ,
-  yDets = ,
+  detectorIndex = nimData$detectorIndex,
+  nDetectorsLESS = nimData$nDetectorsLESS, 
+  habitatIDDet = nimData$habitatIDDet,
+  yDets = nimData$yDets,
   nbDetections = 
 )
 ```
@@ -335,7 +340,12 @@ str(nimData$y.alive)
 dim(nimData$y.alive)
 head(nimData$y.alive)
 nimData$y.alive[1,,]
+
+nimData$detCovs
+sxy
 ```
 -> y.alive de dimension [individu x detector x year]
 
+# detections
+on crée des individus pas detectés.
 

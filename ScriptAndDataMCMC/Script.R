@@ -30,14 +30,14 @@ source("pointProcess.R")
 
 #RUN NIMBLE MODEL (demonstration with single chain and low number of iterations)
 model <- nimbleModel( code = modelCode
-                      , constants = nimConstants
-                      , data = nimData
-                      , inits = nimInits
+                      , constants = simul.nimConstants
+                      , data = simul.nimData
+                      , inits = simul.nimInits
                       , check = FALSE       
                       , calculate = FALSE)  
 cmodel <- compileNimble(model)
 cmodel$calculate()
-MCMCconf <- configureMCMC(model = model, monitors = c(nimParams),
+MCMCconf <- configureMCMC(model = model, monitors = c(simul.nimParams),
                           control = list(reflective = TRUE, adaptScaleOnly = TRUE),
                           useConjugacy = FALSE) 
 MCMC <- buildMCMC(MCMCconf) ## NE SE LANCE PAS??
@@ -132,9 +132,7 @@ model <- nimble::nimbleModel( # Processes BUGS model code and returns NIMBLE mod
   calculate = FALSE
   )  
 
-nimParams  
-
-summary(model$getNodeNames())  # All variables/parameters in model
+model$getNodeNames()  # All variables/parameters in model
 # 96498 parameters in model
 
 model$getVarNames()   # Just the variable names

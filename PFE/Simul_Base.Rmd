@@ -115,6 +115,7 @@ for (t in 1:(simul.nimConstants$n.years - 1)) {
 Matrice binaire : vivant ou non.
 ```{r}
 isAlive <- ifelse(z==2, 1, 0)
+dim(isAlive)
 ```
 
 ### sxy
@@ -144,7 +145,7 @@ rbinomPPSingle_inside_zone <- function(
       coords = c("x","y"),
       crs = st_crs(polygon)
       )
-    if (st_within(pt_sf, polygon, sparse = FALSE)[1,1]) {
+    if (st_within(pt_sf, polygon, sparse = FALSE, prepared = TRUE)[1,1]) {
       return(pt)
     }
   }
@@ -169,7 +170,7 @@ rbinomMNormSourcePPSingle_inside_zone <- function(
     pt_sf <- st_as_sf(data.frame(x=pt[1], y=pt[2]),
                       coords = c("x","y"),
                       crs = st_crs(polygon))
-    if (st_within(pt_sf, polygon, sparse = FALSE)[1,1]) {
+    if (st_within(pt_sf, polygon, sparse = FALSE, prepared = TRUE)[1,1]) {
       return(pt)
     }
   }
@@ -209,46 +210,78 @@ for (j in 1:simul.nimConstants$n.individuals){
 }
 
 ```
-# Correction chat a corriger.
-```{r}
-sxy <- array(NA,
-             dim = c(nimConstants$n.individuals,
-                     nimConstants$n.years,
-                     2))
 
-for (j in 1:nimConstants$n.individuals) {
+```{r, warning=FALSE}
+sf::sf_use_s2()
+
+for (j in 1:nrow(isAlive)) {
   
   alive_years <- which(isAlive[j, ] == 1)
-  
-  if (length(alive_years) == 0) next  # never alive
+  if (length(alive_years) == 0) next
   
   first_year <- min(alive_years)
   
-  # ---- Initial AC at first alive year ----
+  # Initial AC
   sxy[j, first_year, ] <- rbinomPPSingle_inside_zone(
     lower = LowerHabCoords_fix,
     upper = UpperHabCoords_fix,
     polygon = zone_union)
   
-  # ---- Movement while alive ----
-  for (t in (first_year + 1):nimConstants$n.years) {
+  # Only run if there are later years
+  if (first_year < ncol(isAlive)) {
     
-    if (isAlive[j, t] == 1) {
+    for (t in (first_year + 1):ncol(isAlive)) {
+      
+      if (!isAlive[j, t]) break
       
       sxy[j, t, ] <- rbinomMNormSourcePPSingle_inside_zone(
         lower = LowerHabCoords_fix,
         upper = UpperHabCoords_fix,
         sourceCoords = sxy[j, t - 1, ],
         polygon = zone_union)
-      
-    } else {
-      break  # stop movement once dead
     }
   }
 }
 ```
+## les detections : y.alive
+```{r}
+simul.y.alive <- array(0, 
+                       dim = c(
+                         simul.nimConstants$n.individuals,
+                         nimConstants$n.detectors, 
+                         simul.nimConstants$n.years)
+                       )
+
+trials <- rep(10, nimConstants$n.detectors)
 
 
+for (i in 1:simul.nimConstants$n.individuals) {
+  for (t in 1:simul.nimConstants$n.years) {
+    
+    # Skip si not alive
+    if (isAlive[i,t] != 1) next
+    
+    # Distance to all detectors
+    dists <- sqrt(
+      (sxy[i,t,1] - nimData$detector.xy[,1])^2 +
+      (sxy[i,t,2] - nimData$detector.xy[,2])^2
+    )
+    
+    # Detection probability
+    pijt <- nimInits$p0[t] * exp(-(dists^2)) / (2 * simul.nimInits$sigma^2)
+    
+    # Simulate detections
+    simul.y.alive[i, , t] <- rbinom(
+      simul.nimConstants$n.detectors,
+      size = trials,
+      prob = pijt
+    )
+  }
+}
+
+View(simul.y.alive)
+table(simul.y.alive[4, , ])
+```
 
 ## Regroupement de tout
 ```{r}
@@ -265,7 +298,7 @@ simul.nimData <- list(
   trials = ,
   alpha = ,
   detector.xy = ,
-  sxy = ,
+  sxy = sxy,
   detectorIndex = ,
   nDetectorsLESS = , 
   habitatIDDet = ,

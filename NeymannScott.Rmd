@@ -1,0 +1,52 @@
+---
+title: "Neyman Scott"
+author: "Fanny Moreau"
+date: "2026-03-04"
+output: pdf_document
+---
+
+```{r}
+library(spatstat.random)
+library(spatstat.geom)
+```
+
+```{r}
+# Simulation rThomas
+
+?rThomas()
+
+# Paramètres
+kappa <- 20     # grand = beaucoup de clusters
+mu    <- 20     # grand = clusters tres denses
+sigma <- 0.05   # grand = diffus, petit = serres
+
+# Simulation
+X <- rThomas(kappa = kappa,
+             mu = mu,
+             sigma = sigma)
+
+# Affichage
+plot(X, main="Processus de Thomas (Neyman-Scott)")
+```
+
+```{r}
+xrange <- c(0, simul.nimConstants$x.maxDet)
+yrange <- c(0, simul.nimConstants$y.maxDet)
+win <- owin(xrange, yrange)
+
+# Paramètres Neyman-Scott
+lambda_p <- 5        # densité des centres
+mu <- 20             # nb moyen d'individus par cluster
+sigma_c <- 2         # dispersion intra-cluster
+
+# Simulation d'un processus de Thomas (cas particulier Neyman-Scott)
+pp <- rThomas(
+  kappa = lambda_p,  # intensité des centres
+  scale = sigma_c,   # dispersion
+  mu = mu,           # nb moyen de descendants
+  win = win
+)
+
+plot(pp, main="Simulation Neyman-Scott (Thomas)")
+```
+

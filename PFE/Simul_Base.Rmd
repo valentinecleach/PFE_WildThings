@@ -11,11 +11,6 @@ library(ggplot2)
 library(gtools)
 ```
 
-
-```{r}
-
-```
-
 # nimConstants
 ```{r}
 simul.nimConstants = list(n.individuals = 1000, 
@@ -94,8 +89,8 @@ for (t in 1:simul.nimConstants$n.years1) {
 Matrice de l'état de nos individus a chaque étape
 ```{r}
 # State matrix (individual x year)
-z <- matrix(NA, 
-            nrow = simul.nimConstants$n.individuals, 
+z <- matrix(NA,
+            nrow = simul.nimConstants$n.individuals,
             ncol = simul.nimConstants$n.years)
 
 # ---- Etat initial ----
@@ -184,17 +179,17 @@ rbinomMNormSourcePPSingle_inside_zone <- function(
 zone_union <- st_union(zone)  # merge Sweden + Norway
 
 sxy <- array(NA,
-      dim = c(nimConstants$n.individuals,
-              nimConstants$n.years,
+      dim = c(simul.nimConstants$n.individuals,
+              simul.nimConstants$n.years,
               2))
 # sxy dim : [i , t , coord]
 
 sxy <- array(NA,
-             dim = c(nimConstants$n.individuals,
-                     nimConstants$n.years,
+             dim = c(simul.nimConstants$n.individuals,
+                     simul.nimConstants$n.years,
                      2))
 
-for (j in 1:nimConstants$n.individuals){
+for (j in 1:simul.nimConstants$n.individuals){
   
   # Year 1: initial activity center
   sxy[j, 1, ] <- rbinomPPSingle_inside_zone(

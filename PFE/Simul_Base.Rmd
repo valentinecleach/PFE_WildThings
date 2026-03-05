@@ -335,7 +335,12 @@ str(nimData$y.alive)
 dim(nimData$y.alive)
 head(nimData$y.alive)
 nimData$y.alive[1,,]
+
+nimData$detCovs
+sxy
 ```
 -> y.alive de dimension [individu x detector x year]
 
+# detections
+on crée des individus pas detectés.
 

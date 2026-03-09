@@ -13,7 +13,7 @@ library(gtools)
 
 # nimConstants
 ```{r}
-simul.nimConstants = list(n.individuals = 1000, 
+simul.nimConstants = list(n.individuals = 1000,
                            n.detected = 749,
                            n.detected1 = 750,
                            n.detectors = 6457,
@@ -37,7 +37,6 @@ simul.nimInits <- list(
               dim = c(simul.nimConstants$n.individuals,
                       simul.nimConstants$n.years,
                       2)),
-  # jsp
   dispSigma = 3,
   z = matrix(NA,
              ncol=simul.nimConstants$n.years,

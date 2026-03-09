@@ -1,23 +1,21 @@
-rm(list=ls())
+rm(list=ls()) # vider l'environnement
 
 library(nimble) # Bayesien
-library(raster) # pour lire les maps pixels
+library(raster) # Maps pixels
 
-home <- getwd() 
+home <- getwd() # chemin fichier
 
 ##########
 ## BEAR ##
 ##########
+
 ## LOAD NIMBLE FUNCTIONS AND DATA 
 
-
-
-setwd(file.path(home,"ScriptAndDataMCMC/Bear")) # Selectionnement de l'ours
+setwd(file.path(home,"ScriptAndDataMCMC/Bear")) # chemin ours
 
 
 ## LOAD FEMALE DATA
 load("17.F_12_18_INPUTChain1.RData") # Importer dans env les choses
-
 
 print(modelCode)
 
@@ -107,7 +105,7 @@ plot(DensityRasterBrick)
 ###############
 
 # To help load without writing whole path (doesn't always work)
-setwd(file.path(home,"ScriptAndDataMCMC/Wolverine")) 
+setwd(file.path(home,"ScriptAndDataMCMC/Wolverine"))
 
 ## LOAD FEMALE DATA
 load("22.J_Fa1.RData") # Loads not only data but also other stuff

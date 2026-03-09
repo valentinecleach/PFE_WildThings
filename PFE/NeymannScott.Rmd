@@ -6,8 +6,7 @@ output: pdf_document
 ---
 
 ```{r}
-library(spatstat.random)
-library(spatstat.geom)
+library(spatstat)
 ```
 
 ```{r}

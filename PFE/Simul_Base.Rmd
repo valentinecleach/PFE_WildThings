@@ -45,7 +45,7 @@ simul.nimInits <- list(
   # a changer -> quand mettre z=1?
   omeg1 = nimInits$omeg1,
   gamma = nimInits$gamma,
-  p0 = nimInits$p0,
+  p0 = nimInits$p0, 
   # p0 = matrix(NA,ncol=(simul.nimConstants$n.years+1),nrow=simul.nimConstants$n.years),
   sigma = 1.71,
   betaDens = 0.03, # round
@@ -252,11 +252,38 @@ for (j in 1:nrow(isAlive)) {
 simul.y.alive <- array(0, 
                        dim = c(
                          simul.nimConstants$n.individuals,
-                         nimConstants$n.detectors, 
+                         simul.nimConstants$n.detectors, 
                          simul.nimConstants$n.years)
                        )
 
-trials <- rep(10, nimConstants$n.detectors)
+simul.y.dead <- array(0,
+                      dim=c(
+                        simul.nimConstants$n.individuals,
+                        simul.nimConstants$n.detectors,
+                        simul.nimConstants$n.years))
+
+z <- nimData$z
+
+y.dead <- matrix(0,
+                 nrow = nrow(z),
+                 ncol = ncol(z))
+
+for (i in 1:nrow(z)) {
+  
+  dead_years <- which(z[i, ] %in% c(3,4))
+  
+  if (length(dead_years) > 0) {
+    first_dead <- min(dead_years)
+    y.dead[i, first_dead] <- 1
+  }
+}
+```
+
+
+```{r}
+trials <- matrix(10,
+                 nrow = simul.nimConstants$n.detectors,
+                 ncol = simul.nimConstants$n.years)
 
 
 for (i in 1:simul.nimConstants$n.individuals) {
@@ -272,8 +299,8 @@ for (i in 1:simul.nimConstants$n.individuals) {
     )
     
     # Detection probability
-    pijt <- nimInits$p0[t] * exp(-(dists^2)) / (2 * simul.nimInits$sigma^2)
-    
+    pijt <- nimInits$p0[t] * exp(-(dists^2) / (2 * simul.nimInits$sigma^2))
+
     # Simulate detections
     simul.y.alive[i, , t] <- rbinom(
       simul.nimConstants$n.detectors,
@@ -282,10 +309,8 @@ for (i in 1:simul.nimConstants$n.individuals) {
     )
   }
 }
-
-View(simul.y.alive)
-table(simul.y.alive[4, , ])
-sxy[1,,1]
+nbDetections <- apply(simul.y.alive, c(1,3), sum)
+detResponse[,,t] <- simul.y.alive[,,t] > 0
 ```
 
 ## Regroupement de tout
@@ -298,9 +323,9 @@ simul.nimData <- list(
   upperHabCoords = nimData$upperHabCoords,
   detCountries = nimData$detCountries,
   detCovs = nimData$detCovs,
-  detResponse = , # Jsp ce que c'est
+  detResponse = detResponse, 
   denCounts = nimData$denCounts,
-  trials = nimData$trials, # 
+  trials = nimData$trials,  
   alpha = c(1,1,1),
   detector.xy = nimData$detector.xy,
   sxy = sxy,
@@ -308,7 +333,7 @@ simul.nimData <- list(
   nDetectorsLESS = nimData$nDetectorsLESS, 
   habitatIDDet = nimData$habitatIDDet,
   yDets = nimData$yDets,
-  nbDetections = 
+  nbDetections = nbDetections 
 )
 ```
 
@@ -340,9 +365,6 @@ str(nimData$y.alive)
 dim(nimData$y.alive)
 head(nimData$y.alive)
 nimData$y.alive[1,,]
-
-nimData$detCovs
-sxy
 ```
 -> y.alive de dimension [individu x detector x year]
 

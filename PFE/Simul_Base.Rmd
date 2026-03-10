@@ -214,16 +214,12 @@ zone_union <- st_union(zone)  # merge Sweden + Norway
 # sxy dim : [i , t , coord]
 ```
 
-
-```{r}
+```{r, message=FALSE}
 sxy <- array(NA,
              dim = c(simul.nimConstants$n.individuals,
                      simul.nimConstants$n.years,
                      2))
-```
 
-
-```{r, message=FALSE}
 for (j in 1:simul.nimConstants$n.individuals){
   
   # Year 1: initial activity center
@@ -242,7 +238,6 @@ for (j in 1:simul.nimConstants$n.individuals){
       polygon = zone_union)
   }
 }
-
 
 for (j in 1:nrow(isAlive)) {
   
@@ -273,6 +268,12 @@ for (j in 1:nrow(isAlive)) {
   }
 }
 ```
+## trials
+```{r}
+# trials should be a VECTOR (one value per detector, constant across years)
+trials <- rep(10, simul.nimConstants$n.detectors)
+```
+
 ## les detections : y.alive
 ```{r}
 simul.y.alive <- array(0, 
@@ -282,12 +283,29 @@ simul.y.alive <- array(0,
                          simul.nimConstants$n.years)
                        )
 
-```
+for (i in 1:simul.nimConstants$n.individuals) {
+  for (t in 1:simul.nimConstants$n.years) {
+    
+    # Skip si not alive
+    if (isAlive[i,t] != 1) next
+    
+    # Distance to all detectors
+    dists <- sqrt(
+      (sxy[i,t,1] - nimData$detector.xy[,1])^2 +
+      (sxy[i,t,2] - nimData$detector.xy[,2])^2
+    )
+    
+    # Detection probability
+    pijt <- nimInits$p0[, t] * exp(-(dists^2) / (2 * simul.nimInits$sigma^2))
 
-## trials
-```{r}
-# trials should be a VECTOR (one value per detector, constant across years)
-trials <- rep(10, simul.nimConstants$n.detectors)
+    # Simulate detections
+    simul.y.alive[i, , t] <- rbinom(
+      simul.nimConstants$n.detectors,
+      size = trials,
+      prob = pijt
+    )
+  }
+}
 ```
 
 ## y.dead
@@ -314,33 +332,14 @@ for(i in 1:simul.nimConstants$n.individuals) {
 }
 ```
 
+## nbDetections
 
 ```{r}
-for (i in 1:simul.nimConstants$n.individuals) {
-  for (t in 1:simul.nimConstants$n.years) {
-    
-    # Skip si not alive
-    if (isAlive[i,t] != 1) next
-    
-    # Distance to all detectors
-    dists <- sqrt(
-      (sxy[i,t,1] - nimData$detector.xy[,1])^2 +
-      (sxy[i,t,2] - nimData$detector.xy[,2])^2
-    )
-    
-    # Detection probability
-    pijt <- nimInits$p0[, t] * exp(-(dists^2) / (2 * simul.nimInits$sigma^2))
-
-    # Simulate detections
-    simul.y.alive[i, , t] <- rbinom(
-      simul.nimConstants$n.detectors,
-      size = trials,
-      prob = pijt
-    )
-  }
-}
 nbDetections <- apply(simul.y.alive, 1, sum)
+```
 
+## detResponse
+```{r}
 detResponse <- simul.y.alive > 0
 ```
 
@@ -349,7 +348,7 @@ detResponse <- simul.y.alive > 0
 simul.nimData <- list(
   z = z,
   y.alive = simul.y.alive,
-  y.dead = y.dead, # Facile
+  y.dead = y.dead, 
   LowerHabCoords = nimData$lowerHabCoords,
   upperHabCoords = nimData$upperHabCoords,
   detCountries = nimData$detCountries,
@@ -367,9 +366,3 @@ simul.nimData <- list(
   nbDetections = nbDetections 
 )
 ```
-# 4.
-
-```{r}
-
-```
-

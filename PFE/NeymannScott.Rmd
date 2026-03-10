@@ -5,49 +5,234 @@ date: "2026-03-04"
 output: pdf_document
 ---
 
+## Procédure de Neyman-Scott pour traduire les caractères sociaux des animaux
+
+### Libraries et packages
+
+```{r, echo=FALSE}
+library(spatstat.random)
+library(spatstat.geom)
+library(sf)
+library(dplyr)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(ggplot2)
+```
+
+### Donnees de l'etude comme reference
+
+```{r, echo=FALSE}
+load("C:/Users/fanny/Desktop/Ensai/3A/PFE/PFE_WildThings/ScriptAndDataMCMC/Wolverine/22.J_Fa1.RData")
+```
+
+### Simulation : nimConstants
+
 ```{r}
-library(spatstat)
+simul.nimConstants = list(n.individuals = 1000,
+                           n.detected = 749,
+                           n.detected1 = 750,
+                           n.detectors = 6457,
+                           n.years = 7,
+                           n.years1 = 6,
+                           n.covs = 3,
+                           numHabWindows = 1802,
+                           n.countries = 8,
+                           y.maxDet = 25,
+                           x.maxDet = 21,
+                           ResizeFactor = 3,
+                           n.cellsSparse = 244,
+                           maxNBDets = 180,
+                           nMaxDetectors = 6)
+```
+
+### Simulation : nimInits
+
+```{r}
+simul.nimInits <- list(sxy = array(NA,
+                                   dim = c(simul.nimConstants$n.individuals,
+                                           simul.nimConstants$n.years,
+                                           2)),
+                       dispSigma = 3,
+                       z = matrix(NA,
+                                  ncol=simul.nimConstants$n.years,
+                                  nrow=simul.nimConstants$n.individuals),
+                       omeg1 = nimInits$omeg1,
+                       gamma = nimInits$gamma,
+                       p0 = nimInits$p0,
+                       sigma = 1.71,
+                       betaDens = 0.03,
+                       betaCovs = c(0.07, 0.08, 0.06),
+                       betaResponse = -0.0386,
+                       h = nimInits$h,
+                       w = nimInits$w)
+```
+
+#### --- Préparation Spatiale ---
+
+```{r}
+zone <- ne_countries(country = c("Sweden", "Norway"), returnclass = "sf")
+zone_buff <- zone %>% st_buffer(dist=2.5)
+hab_windows <- data.frame(x_low = nimData$lowerHabCoords[, "x"],
+                          y_low = nimData$lowerHabCoords[, "y"],
+                          x_up  = nimData$upperHabCoords[, "x"],
+                          y_up  = nimData$upperHabCoords[, "y"])
+
+zone <- st_make_valid(zone)
+zone_union <- zone |> st_union() |> st_as_sf()
+
+hab_centroids <- hab_windows %>%
+  mutate(x = (x_low + x_up) / 2,
+         y = (y_low + y_up) / 2) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(zone))
+
+keep <- st_intersects(hab_centroids, zone_buff, sparse = FALSE)[,1]
+hab_windows_fix <- hab_windows[keep, ]
+
+LowerHabCoords_fix <- as.matrix(hab_windows_fix[, c("x_low", "y_low")])
+UpperHabCoords_fix <- as.matrix(hab_windows_fix[, c("x_up", "y_up")])
+```
+
+### --- Paramétrage ---
+
+```{r}
+target_n <- simul.nimConstants$n.individuals
+kappa_val <- 0.005   # Environ 5 parents pour 1000 km^2
+sigma_val <- 20      # Dispersion de 20 km autour du parent
+```
+
+### --- Définition de la fenêtre d'étude (Window) ---
+```{r}
+x_range <- range(c(LowerHabCoords_fix[, 1], UpperHabCoords_fix[, 1]))
+y_range <- range(c(LowerHabCoords_fix[, 2], UpperHabCoords_fix[, 2]))
+window_thomas <- owin(xrange = x_range, yrange = y_range)
+
+area_window <- spatstat.geom::area.owin(window_thomas)
+mu_val <- (target_n * 3) / (kappa_val * area_window)
+```
+
+### --- Simulation du Processus de Thomas ---
+```{r}
+sim_ppp <- rThomas(kappa = kappa_val, 
+                   sigma = sigma_val, 
+                   mu = mu_val, 
+                   win = window_thomas)
+
+df_thomas <- data.frame(x = sim_ppp$x, y = sim_ppp$y)
+sf_thomas <- st_as_sf(df_thomas, coords = c("x", "y"), crs = NA)
+st_crs(sf_thomas) <- st_crs(zone_union)
+```
+
+### --- Intersection avec votre zone (Suède/Norvège) ---
+
+```{r}
+inside_indices <- st_within(sf_thomas, zone_union, sparse = FALSE)
+valid_points <- df_thomas[as.vector(inside_indices), ]
+
+if(nrow(valid_points) < target_n) {stop(paste("Toujours pas assez de points:", nrow(valid_points), "trouvés. Augmentez mu_val."))}
+
+final_initial_pos <- valid_points[sample(1:nrow(valid_points), target_n), ]
+```
+
+### Fonction pour simuler un mouvement (marche aléatoire) à l'intérieur d'une zone
+
+```{r}
+rbinomMNormSourcePPSingle_inside_zone <- function(lower, upper, polygon, sourceCoords, sd_mouvement = 1.71, max_iter = 1000){
+  for (i in 1:max_iter) {
+    # simul point candidat
+    pt <- rbinomMNormSourcePPSingle(n = 1,
+                                    lowerCoords = lower,
+                                    upperCoords = upper,
+                                    sourceCoords = sourceCoords,
+                                    normSD = sd_mouvement)
+    # verif spatiale
+    pt_sf <- st_as_sf(data.frame(x = pt[1], y = pt[2]),
+                      coords = c("x", "y"),
+                      crs = st_crs(polygon))
+
+    if (st_within(pt_sf, polygon, sparse = FALSE)[1, 1]){
+      return(pt)}
+  }
+  return(sourceCoords) # si pas point trouve dans zone (ex coince au bord)
+}
+```
+
+### --- Intégration dans la structure sxy ---
+```{r}
+# Initialisation de l'objet sxy de dimension [Individus, Années, Coordonnées]
+sxy <- array(NA, dim = c(target_n, simul.nimConstants$n.years, 2))
+
+# Année 1 : Positions Thomas
+sxy[, 1, 1] <- final_initial_pos$x
+sxy[, 1, 2] <- final_initial_pos$y
+
+# Boucle temporelle
+for (j in 1:target_n) {
+  for (t in 2:simul.nimConstants$n.years) {
+    sxy[j, t, ] <- rbinomMNormSourcePPSingle_inside_zone(
+      lower = LowerHabCoords_fix,
+      upper = UpperHabCoords_fix,
+      sourceCoords = sxy[j, t - 1, ],
+      polygon = zone_union)
+  }
+}
 ```
 
 ```{r}
-# Simulation rThomas
+n_ind <- dim(sxy)[1]
+n_time <- dim(sxy)[2]
 
-?rThomas()
-
-# Paramètres
-kappa <- 20     # grand = beaucoup de clusters
-mu    <- 20     # grand = clusters tres denses
-sigma <- 0.05   # grand = diffus, petit = serres
-
-# Simulation
-X <- rThomas(kappa = kappa,
-             mu = mu,
-             sigma = sigma)
-
-X$x
-
-# Affichage
-plot(X, main="Processus de Thomas (Neyman-Scott)")
-```
-
-```{r}
-xrange <- c(0, simul.nimConstants$x.maxDet)
-yrange <- c(0, simul.nimConstants$y.maxDet)
-win <- owin(xrange, yrange)
-
-# Paramètres Neyman-Scott
-lambda_p <- 5        # densité des centres
-mu <- 20             # nb moyen d'individus par cluster
-sigma_c <- 2         # dispersion intra-cluster
-
-# Simulation d'un processus de Thomas (cas particulier Neyman-Scott)
-pp <- rThomas(
-  kappa = lambda_p,  # intensité des centres
-  scale = sigma_c,   # dispersion
-  mu = mu,           # nb moyen de descendants
-  win = win
+df_move <- expand.grid(
+  id = 1:n_ind,
+  time = 1:n_time
 )
 
-plot(pp, main="Simulation Neyman-Scott (Thomas)")
+df_move$x <- as.vector(sxy[,,1])
+df_move$y <- as.vector(sxy[,,2])
+```
+
+```{r}
+ggplot(df_move, aes(x = x, y = y, colour = factor(id))) +
+  geom_path() +
+  geom_point() +
+  theme_minimal() +
+  guides(colour = "none")
+```
+```{r}
+ggplot(df_move, aes(x = x, y = y)) +
+  stat_density_2d(
+    aes(fill = after_stat(density)),
+    geom = "raster",
+    contour = FALSE
+  ) +
+  scale_fill_viridis_c(name = "Densité") +
+  facet_wrap(~year) +
+  coord_equal() +
+  theme_minimal() +
+  labs(
+    title = "Densité de population par année",
+    x = "X",
+    y = "Y"
+  )
+```
+
+
+```{r}
+ggplot() +
+  geom_sf(data = zone_union, fill = "grey95") +
+  geom_path(
+    data = df_move,
+    aes(x = x, y = y, group = id),
+    colour = "steelblue",
+    alpha = 0.3
+  ) +
+  geom_point(
+    data = df_move,
+    aes(x = x, y = y),
+    size = 0.5,
+    colour = "darkred"
+  ) +
+  coord_sf() +
+  theme_minimal() +
+  labs(title = "Simulation des trajectoires dans la zone d'habitat")
 ```
 

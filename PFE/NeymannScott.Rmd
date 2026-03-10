@@ -202,37 +202,12 @@ ggplot(df_move, aes(x = x, y = y)) +
   stat_density_2d(
     aes(fill = after_stat(density)),
     geom = "raster",
-    contour = FALSE
+    contour = FALSE,
+    alpha = 0.8
   ) +
+  geom_point(size = 0.4, alpha = 0.3) +
   scale_fill_viridis_c(name = "Densité") +
-  facet_wrap(~year) +
+  facet_wrap(~time) +
   coord_equal() +
-  theme_minimal() +
-  labs(
-    title = "Densité de population par année",
-    x = "X",
-    y = "Y"
-  )
+  theme_minimal()
 ```
-
-
-```{r}
-ggplot() +
-  geom_sf(data = zone_union, fill = "grey95") +
-  geom_path(
-    data = df_move,
-    aes(x = x, y = y, group = id),
-    colour = "steelblue",
-    alpha = 0.3
-  ) +
-  geom_point(
-    data = df_move,
-    aes(x = x, y = y),
-    size = 0.5,
-    colour = "darkred"
-  ) +
-  coord_sf() +
-  theme_minimal() +
-  labs(title = "Simulation des trajectoires dans la zone d'habitat")
-```
-

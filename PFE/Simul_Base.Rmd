@@ -30,6 +30,16 @@ simul.nimConstants = list(n.individuals = 1000,
                            nMaxDetectors = 6)
 ```
 
+```{r}
+truth <- list(
+  sigma = 1.71,
+  dispSigma = 3,
+  betaDens = 0.03,
+  betaCovs = c(0.07,0.08,0.06),
+  betaResponse = -0.0386
+)
+```
+
 # nimInits
 ```{r}
 simul.nimInits <- list(
@@ -37,7 +47,7 @@ simul.nimInits <- list(
               dim = c(simul.nimConstants$n.individuals,
                       simul.nimConstants$n.years,
                       2)),
-  dispSigma = 3,
+  dispSigma = truth$dispSigma,
   z = matrix(NA,
              ncol=simul.nimConstants$n.years,
              nrow=simul.nimConstants$n.individuals),
@@ -46,10 +56,10 @@ simul.nimInits <- list(
   gamma = nimInits$gamma,
   p0 = nimInits$p0, 
   # p0 = matrix(NA,ncol=(simul.nimConstants$n.years+1),nrow=simul.nimConstants$n.years),
-  sigma = 1.71,
-  betaDens = 0.03, # round
-  betaCovs = c(0.07, 0.08, 0.06), # round de truc de base.
-  betaResponse = -0.0386,
+  sigma = truth$sigma,
+  betaDens = truth$betaDens, # round
+  betaCovs = truth$betaCovs, # round de truc de base.
+  betaResponse = truth$betaResponse,
   h = nimInits$h,
   w = nimInits$w
 )
@@ -57,9 +67,7 @@ simul.nimInits <- list(
 
 # nimData
 
-## Temporalité 
-
-### changement d'états
+## Changement d'états
 ```{r}
 # création de trucs vides pour stocker nos variables
 gamma <- numeric(simul.nimConstants$n.years1)
@@ -83,12 +91,9 @@ for (t in 1:simul.nimConstants$n.years1) {
   omega[3, , t] <- c(0, 0, 0, 1)
   omega[4, , t] <- c(0, 0, 0, 1)
 }
-
-nimData$sxy[5,1,]
-which(!is.na(nimData$sxy))
 ```
 
-### z matrice etats pour individus
+## z matrice etats pour individus
 Matrice de l'état de nos individus a chaque étape
 ```{r}
 # State matrix (individual x year)
@@ -114,18 +119,42 @@ for (t in 1:(simul.nimConstants$n.years - 1)) {
 }
 ```
 
-### isAlive
+## isAlive
 Matrice binaire : vivant ou non.
 ```{r}
 isAlive <- ifelse(z==2, 1, 0)
-dim(isAlive)
 ```
 
-### sxy
+## sxy
 ```{r}
 # Charger les pays
 zone <- countries(c("Sweden", "Norway")) %>%
   st_as_sf()
+zone_buff <- zone %>%
+  st_buffer(dist=2.5)
+hab_windows <- data.frame(
+  x_low = nimData$lowerHabCoords[, "x"],
+  y_low = nimData$lowerHabCoords[, "y"],
+  x_up  = nimData$upperHabCoords[, "x"],
+  y_up  = nimData$upperHabCoords[, "y"]
+)
+hab_centroids <- hab_windows %>%
+  mutate(
+    x = (x_low + x_up) / 2,
+    y = (y_low + y_up) / 2
+  ) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(zone))
+
+keep <- st_intersects(hab_centroids, zone_buff, sparse = FALSE)[,1]
+hab_windows_fix <- hab_windows[keep, ]
+
+LowerHabCoords_fix <- as.matrix(
+  hab_windows_fix[, c("x_low", "y_low")]
+)
+UpperHabCoords_fix <- as.matrix(
+  hab_windows_fix[, c("x_up", "y_up")]
+)
+
 
 # On prends des pts qui tombent dans notre zone
 rbinomPPSingle_inside_zone <- function(
@@ -182,12 +211,10 @@ rbinomMNormSourcePPSingle_inside_zone <- function(
 
 zone_union <- st_union(zone)  # merge Sweden + Norway
 
-sxy <- array(NA,
-      dim = c(simul.nimConstants$n.individuals,
-              simul.nimConstants$n.years,
-              2))
 # sxy dim : [i , t , coord]
+```
 
+```{r, message=FALSE}
 sxy <- array(NA,
              dim = c(simul.nimConstants$n.individuals,
                      simul.nimConstants$n.years,
@@ -202,7 +229,7 @@ for (j in 1:simul.nimConstants$n.individuals){
     polygon = zone_union)
   
   # Movement through years
-  for (i in 2:nimConstants$n.years){
+  for (i in 2:simul.nimConstants$n.years){
     
     sxy[j, i, ] <- rbinomMNormSourcePPSingle_inside_zone(
       lower = LowerHabCoords_fix,
@@ -211,11 +238,6 @@ for (j in 1:simul.nimConstants$n.individuals){
       polygon = zone_union)
   }
 }
-
-```
-
-```{r, warning=FALSE}
-sf::sf_use_s2()
 
 for (j in 1:nrow(isAlive)) {
   
@@ -246,6 +268,12 @@ for (j in 1:nrow(isAlive)) {
   }
 }
 ```
+## trials
+```{r}
+# trials should be a VECTOR (one value per detector, constant across years)
+trials <- rep(10, simul.nimConstants$n.detectors)
+```
+
 ## les detections : y.alive
 ```{r}
 simul.y.alive <- array(0, 
@@ -254,36 +282,6 @@ simul.y.alive <- array(0,
                          simul.nimConstants$n.detectors, 
                          simul.nimConstants$n.years)
                        )
-
-simul.y.dead <- array(0,
-                      dim=c(
-                        simul.nimConstants$n.individuals,
-                        simul.nimConstants$n.detectors,
-                        simul.nimConstants$n.years))
-
-z <- nimData$z
-
-y.dead <- matrix(0,
-                 nrow = nrow(z),
-                 ncol = ncol(z))
-
-for (i in 1:nrow(z)) {
-  
-  dead_years <- which(z[i, ] %in% c(3,4))
-  
-  if (length(dead_years) > 0) {
-    first_dead <- min(dead_years)
-    y.dead[i, first_dead] <- 1
-  }
-}
-```
-
-
-```{r}
-trials <- matrix(10,
-                 nrow = simul.nimConstants$n.detectors,
-                 ncol = simul.nimConstants$n.years)
-
 
 for (i in 1:simul.nimConstants$n.individuals) {
   for (t in 1:simul.nimConstants$n.years) {
@@ -298,7 +296,7 @@ for (i in 1:simul.nimConstants$n.individuals) {
     )
     
     # Detection probability
-    pijt <- nimInits$p0[t] * exp(-(dists^2) / (2 * simul.nimInits$sigma^2))
+    pijt <- nimInits$p0[, t] * exp(-(dists^2) / (2 * simul.nimInits$sigma^2))
 
     # Simulate detections
     simul.y.alive[i, , t] <- rbinom(
@@ -308,8 +306,41 @@ for (i in 1:simul.nimConstants$n.individuals) {
     )
   }
 }
-nbDetections <- apply(simul.y.alive, c(1,3), sum)
-detResponse[,,t] <- simul.y.alive[,,t] > 0
+```
+
+## y.dead
+```{r}
+y.dead <- matrix(0, 
+                 nrow = simul.nimConstants$n.individuals,
+                 ncol = simul.nimConstants$n.detectors)
+
+for(i in 1:simul.nimConstants$n.individuals) {
+  # Dead individuals (states 1, 3, 4 = not in state 2)
+  # can sometimes still be detected with low probability
+  dead_years <- which(z[i, ] != 2)
+  
+  if(length(dead_years) > 0) {
+    for(t in dead_years) {
+      # Rare detections of dead/absent animals
+      y.dead[i, ] <- y.dead[i, ] + rbinom(
+        simul.nimConstants$n.detectors,
+        size = trials,  # or trials if per-detector
+        prob = 0.001  # small background detection probability
+      )
+    }
+  }
+}
+```
+
+## nbDetections
+
+```{r}
+nbDetections <- apply(simul.y.alive, 1, sum)
+```
+
+## detResponse
+```{r}
+detResponse <- simul.y.alive > 0
 ```
 
 ## Regroupement de tout
@@ -317,14 +348,14 @@ detResponse[,,t] <- simul.y.alive[,,t] > 0
 simul.nimData <- list(
   z = z,
   y.alive = simul.y.alive,
-  y.dead = , # Facile
+  y.dead = y.dead, 
   LowerHabCoords = nimData$lowerHabCoords,
   upperHabCoords = nimData$upperHabCoords,
   detCountries = nimData$detCountries,
   detCovs = nimData$detCovs,
   detResponse = detResponse, 
   denCounts = nimData$denCounts,
-  trials = nimData$trials,  
+  trials = trials,  
   alpha = c(1,1,1),
   detector.xy = nimData$detector.xy,
   sxy = sxy,
@@ -335,38 +366,3 @@ simul.nimData <- list(
   nbDetections = nbDetections 
 )
 ```
-
-## brouillon
-```{r}
-state <- sample(1:4, 
-                simul.nimConstants$n.individuals, 
-                replace = TRUE) # repartition initiale
-pop <- matrix(0, nrow = simul.nimConstants$n.years, ncol = 4)
-
-## population initiale
-pop[1, ] <- c(
-  simul.nimConstants$n.individuals/2, 
-  simul.nimConstants$n.individuals/2, 
-  0, 0)  # ex : tous en état 1
-
-for (t in 1:simul.nimConstants$n.years1) {
-  for (states in 1:4) {
-    pop[t + 1, ] <- pop[t + 1, ] +
-      rmultinom(1, pop[t, states], omega[states, , t])
-  }
-}
-```
-
-
-```{r}
-head(nimData$y.alive);head(nimData$z)
-str(nimData$y.alive)
-dim(nimData$y.alive)
-head(nimData$y.alive)
-nimData$y.alive[1,,]
-```
--> y.alive de dimension [individu x detector x year]
-
-# detections
-on crée des individus pas detectés.
-

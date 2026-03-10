@@ -123,17 +123,15 @@ print(modelCode)
 
 model <- nimble::nimbleModel( # Processes BUGS model code and returns NIMBLE model
   code = modelCode, # Code detailled in Wolverine_Explanations.Rmd
-  constants = nimConstants, # n.individuals, n.detected, n.years, etc..
-  data = nimData, # detection, non detection on diff years + data on habitat etc 
-  inits = nimInits, # diff omega, gamma, sigma etc.
+  constants = simul.nimConstants, # n.individuals, n.detected, n.years, etc..
+  data = simul.nimData, # detection, non detection on diff years + data on habitat etc 
+  inits = simul.nimInits, # diff omega, gamma, sigma etc.
   check = FALSE, 
   calculate = FALSE
   )  
 
-model$getNodeNames()  # All variables/parameters in model
-# 96498 parameters in model
+dim(nimData$nbDetections); dim(nimData$detResponse)
 
-model$getVarNames()   # Just the variable names
 
 cmodel <- nimble::compileNimble(model) # Compile the model we created above
 

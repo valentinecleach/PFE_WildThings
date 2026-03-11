@@ -5,8 +5,26 @@ output: pdf_document
 
 ```{r}
 library(spatstat)
-
-?Strauss
-?rStrauss() 
+library(sf)
+library(necountries)
 ```
+
+
+```{r}
+zone_union_proj <- st_transform(zone_union, 2154)
+zone_owin <- as.owin(st_geometry(zone_union_proj))
+
+parametres <- list(beta=0.02, 
+                   gamma=0,
+                   R=50,
+                   W=zone_owin)
+
+X <- rStrauss(beta = parametres$beta,
+              gamma = parametres$gamma,
+              R = parametres$R,
+              W = parametres$W)
+
+plot(X, main="Processus de Strauss")
+```
+
 

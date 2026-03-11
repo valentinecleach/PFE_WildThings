@@ -19,10 +19,13 @@ library(rnaturalearthdata)
 library(ggplot2)
 ```
 
-### Donnees de l'etude comme reference
+### Donnees de l'etude comme reference et fonctions article
 
 ```{r, echo=FALSE}
 load("C:/Users/fanny/Desktop/Ensai/3A/PFE/PFE_WildThings/ScriptAndDataMCMC/Wolverine/22.J_Fa1.RData")
+
+source("C:/Users/fanny/Desktop/Ensai/3A/PFE/PFE_WildThings/ScriptAndDataMCMC/Wolverine/dbin_LESS_Cached_MultipleCovResponse.R")
+source("C:/Users/fanny/Desktop/Ensai/3A/PFE/PFE_WildThings/ScriptAndDataMCMC/Wolverine/pointProcess.R")
 ```
 
 ### Simulation : nimConstants
@@ -48,13 +51,10 @@ simul.nimConstants = list(n.individuals = 1000,
 ### Simulation : nimInits
 
 ```{r}
-simul.nimInits <- list(sxy = array(NA,
-                                   dim = c(simul.nimConstants$n.individuals,
-                                           simul.nimConstants$n.years,
-                                           2)),
+simul.nimInits <- list(sxy = array(NA,dim = c(simul.nimConstants$n.individuals, 
+                                              simul.nimConstants$n.years,2)),
                        dispSigma = 3,
-                       z = matrix(NA,
-                                  ncol=simul.nimConstants$n.years,
+                       z = matrix(NA, ncol=simul.nimConstants$n.years,
                                   nrow=simul.nimConstants$n.individuals),
                        omeg1 = nimInits$omeg1,
                        gamma = nimInits$gamma,
@@ -70,8 +70,8 @@ simul.nimInits <- list(sxy = array(NA,
 #### --- Préparation Spatiale ---
 
 ```{r}
-zone <- ne_countries(country = c("Sweden", "Norway"), returnclass = "sf")
-zone_buff <- zone %>% st_buffer(dist=2.5)
+zone <- ne_countries(country = c("Sweden", "Norway"), returnclass = "sf") # recupere frontieres geographiques
+zone_buff <- zone %>% st_buffer(dist=2.5) # zone tampon (evite effet de bordure)
 hab_windows <- data.frame(x_low = nimData$lowerHabCoords[, "x"],
                           y_low = nimData$lowerHabCoords[, "y"],
                           x_up  = nimData$upperHabCoords[, "x"],
@@ -85,6 +85,7 @@ hab_centroids <- hab_windows %>%
          y = (y_low + y_up) / 2) %>%
   st_as_sf(coords = c("x", "y"), crs = st_crs(zone))
 
+# que fenetres d'habitat dans zone d'etude
 keep <- st_intersects(hab_centroids, zone_buff, sparse = FALSE)[,1]
 hab_windows_fix <- hab_windows[keep, ]
 
@@ -125,6 +126,7 @@ st_crs(sf_thomas) <- st_crs(zone_union)
 ### --- Intersection avec votre zone (Suède/Norvège) ---
 
 ```{r}
+# que les points sur la carte
 inside_indices <- st_within(sf_thomas, zone_union, sparse = FALSE)
 valid_points <- df_thomas[as.vector(inside_indices), ]
 
@@ -137,6 +139,7 @@ final_initial_pos <- valid_points[sample(1:nrow(valid_points), target_n), ]
 
 ```{r}
 rbinomMNormSourcePPSingle_inside_zone <- function(lower, upper, polygon, sourceCoords, sd_mouvement = 1.71, max_iter = 1000){
+# generer nouvelle position avec marche aleatoire centree en la position precedente
   for (i in 1:max_iter) {
     # simul point candidat
     pt <- rbinomMNormSourcePPSingle(n = 1,
@@ -157,9 +160,10 @@ rbinomMNormSourcePPSingle_inside_zone <- function(lower, upper, polygon, sourceC
 ```
 
 ### --- Intégration dans la structure sxy ---
+
 ```{r}
 # Initialisation de l'objet sxy de dimension [Individus, Années, Coordonnées]
-sxy <- array(NA, dim = c(target_n, simul.nimConstants$n.years, 2))
+sxy <- array(NA, dim = c(target_n, simul.nimConstants$n.years, 2)) # dim = 3 =[individu, annee, coordonees xy]
 
 # Année 1 : Positions Thomas
 sxy[, 1, 1] <- final_initial_pos$x
@@ -211,3 +215,61 @@ ggplot(df_move, aes(x = x, y = y)) +
   coord_equal() +
   theme_minimal()
 ```
+
+
+
+
+```{r}
+# Paramètres de mouvement
+sd_mouvement_parent <- 5  # Vitesse de déplacement des centres sociaux
+sd_dispersion_enfant <- sigma_val # Dispersion des enfants (votre sigma_val de 20km)
+
+# Initialisation
+parents_list <- list()
+# On commence avec les parents générés précédemment
+parents_ppp <- rpoispp(lambda = kappa_val, win = window_thomas)
+current_parents <- parents_ppp 
+
+# Stockage pour ggplot
+df_all_years <- data.frame()
+
+for (t in 1:simul.nimConstants$n.years) {
+  
+  # A. Déplacement des parents (sauf pour l'année 1)
+  if (t > 1) {
+    new_x <- current_parents$x + rnorm(current_parents$n, 0, sd_mouvement_parent)
+    new_y <- current_parents$y + rnorm(current_parents$n, 0, sd_mouvement_parent)
+    current_parents <- ppp(new_x, new_y, window = window_thomas)
+  }
+  
+  # B. Génération des enfants autour des parents actuels
+  year_children_x <- numeric()
+  year_children_y <- numeric()
+  
+  # On veut viser target_n au total
+  mu_par_parent <- target_n / current_parents$n
+  
+  for(i in 1:current_parents$n) {
+    n_kids <- rpois(1, mu_par_parent)
+    if(n_kids > 0) {
+      year_children_x <- c(year_children_x, rnorm(n_kids, current_parents$x[i], sd_dispersion_enfant))
+      year_children_y <- c(year_children_y, rnorm(n_kids, current_parents$y[i], sd_dispersion_enfant))
+    }
+  }
+  
+  # C. Filtrage par zone (Suède/Norvège)
+  temp_df <- data.frame(x = year_children_x, y = year_children_y, year = t)
+  temp_sf <- st_as_sf(temp_df, coords = c("x", "y"), crs = st_crs(zone_union))
+  
+  inside <- st_within(temp_sf, zone_union, sparse = FALSE)
+  valid_children <- temp_df[as.vector(inside), ]
+  
+  # D. Échantillonnage pour avoir exactement target_n si possible
+  if(nrow(valid_children) >= target_n) {
+    valid_children <- valid_children[sample(1:nrow(valid_children), target_n), ]
+  }
+  
+  df_all_years <- rbind(df_all_years, valid_children)
+}
+```
+

@@ -17,6 +17,8 @@ library(dplyr)
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(ggplot2)
+library(nimble)
+library(purrr)
 ```
 
 ### Donnees de l'etude comme reference et fonctions article
@@ -70,25 +72,36 @@ simul.nimInits <- list(sxy = array(NA,dim = c(simul.nimConstants$n.individuals,
 #### --- Préparation Spatiale ---
 
 ```{r}
-zone <- ne_countries(country = c("Sweden", "Norway"), returnclass = "sf") # recupere frontieres geographiques
-zone_buff <- zone %>% st_buffer(dist=2.5) # zone tampon (evite effet de bordure)
+# recupere frontieres geographiques des 2 pays d'etude
+zone <- ne_countries(country = c("Sweden", "Norway"), returnclass = "sf")
+
+# zone tampon (evite effet de bordure en aggrandissant de 2.5km chaque frontiere)
+zone_buff <- zone %>% st_buffer(dist=2.5)
+
+# tableau des fenetres d'habitat
 hab_windows <- data.frame(x_low = nimData$lowerHabCoords[, "x"],
                           y_low = nimData$lowerHabCoords[, "y"],
                           x_up  = nimData$upperHabCoords[, "x"],
                           y_up  = nimData$upperHabCoords[, "y"])
 
+# correction geonmetries invalides
 zone <- st_make_valid(zone)
+
+# fusion des pays (d'abord fusion puis convertion en objet sf)
 zone_union <- zone |> st_union() |> st_as_sf()
 
+# calcul du centre des fenetres d'habitat
 hab_centroids <- hab_windows %>%
   mutate(x = (x_low + x_up) / 2,
-         y = (y_low + y_up) / 2) %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(zone))
+         y = (y_low + y_up) / 2) %>% # coordonnees du centre
+  st_as_sf(coords = c("x", "y"), # coords spatiales 
+           crs = st_crs(zone)) # mettre dans le meme systeme de coordonnees
 
-# que fenetres d'habitat dans zone d'etude
+# selection fenetres d'habitat dans zone d'etude
 keep <- st_intersects(hab_centroids, zone_buff, sparse = FALSE)[,1]
-hab_windows_fix <- hab_windows[keep, ]
+hab_windows_fix <- hab_windows[keep, ] # filtrage
 
+# matrices pour nimble
 LowerHabCoords_fix <- as.matrix(hab_windows_fix[, c("x_low", "y_low")])
 UpperHabCoords_fix <- as.matrix(hab_windows_fix[, c("x_up", "y_up")])
 ```
@@ -96,22 +109,30 @@ UpperHabCoords_fix <- as.matrix(hab_windows_fix[, c("x_up", "y_up")])
 ### --- Paramétrage ---
 
 ```{r}
-target_n <- simul.nimConstants$n.individuals
+target_n <- simul.nimConstants$n.individuals # taille pop voulue
 kappa_val <- 0.005   # Environ 5 parents pour 1000 km^2
 sigma_val <- 20      # Dispersion de 20 km autour du parent
 ```
 
 ### --- Définition de la fenêtre d'étude (Window) ---
+
 ```{r}
+# etendu d'une fenetre
 x_range <- range(c(LowerHabCoords_fix[, 1], UpperHabCoords_fix[, 1]))
 y_range <- range(c(LowerHabCoords_fix[, 2], UpperHabCoords_fix[, 2]))
+
+# creation de la fenetre spatiale
 window_thomas <- owin(xrange = x_range, yrange = y_range)
 
+# calcul surface de la fenetre
 area_window <- spatstat.geom::area.owin(window_thomas)
+
+# calcul de l'intensite du processus parent
 mu_val <- (target_n * 3) / (kappa_val * area_window)
 ```
 
 ### --- Simulation du Processus de Thomas ---
+
 ```{r}
 sim_ppp <- rThomas(kappa = kappa_val, 
                    sigma = sigma_val, 
@@ -138,8 +159,9 @@ final_initial_pos <- valid_points[sample(1:nrow(valid_points), target_n), ]
 ### Fonction pour simuler un mouvement (marche aléatoire) à l'intérieur d'une zone
 
 ```{r}
-rbinomMNormSourcePPSingle_inside_zone <- function(lower, upper, polygon, sourceCoords, sd_mouvement = 1.71, max_iter = 1000){
 # generer nouvelle position avec marche aleatoire centree en la position precedente
+
+rbinomMNormSourcePPSingle_inside_zone <- function(lower, upper, polygon, sourceCoords, sd_mouvement = 1.71, max_iter = 1000){
   for (i in 1:max_iter) {
     # simul point candidat
     pt <- rbinomMNormSourcePPSingle(n = 1,
@@ -216,60 +238,168 @@ ggplot(df_move, aes(x = x, y = y)) +
   theme_minimal()
 ```
 
-
-
+### Fonction qui genere les points parents selon la position precedente
 
 ```{r}
-# Paramètres de mouvement
-sd_mouvement_parent <- 5  # Vitesse de déplacement des centres sociaux
-sd_dispersion_enfant <- sigma_val # Dispersion des enfants (votre sigma_val de 20km)
+simulate_parents <- function(prev_parents, sd_move = 4, window){
 
-# Initialisation
-parents_list <- list()
-# On commence avec les parents générés précédemment
-parents_ppp <- rpoispp(lambda = kappa_val, win = window_thomas)
-current_parents <- parents_ppp 
+  if(nrow(prev_parents) == 0) return(prev_parents)
 
-# Stockage pour ggplot
-df_all_years <- data.frame()
+  new_parents <- data.frame(
+    x = rnorm(nrow(prev_parents), prev_parents$x, sd_move),
+    y = rnorm(nrow(prev_parents), prev_parents$y, sd_move)
+  )
 
-for (t in 1:simul.nimConstants$n.years) {
-  
-  # A. Déplacement des parents (sauf pour l'année 1)
-  if (t > 1) {
-    new_x <- current_parents$x + rnorm(current_parents$n, 0, sd_mouvement_parent)
-    new_y <- current_parents$y + rnorm(current_parents$n, 0, sd_mouvement_parent)
-    current_parents <- ppp(new_x, new_y, window = window_thomas)
-  }
-  
-  # B. Génération des enfants autour des parents actuels
-  year_children_x <- numeric()
-  year_children_y <- numeric()
-  
-  # On veut viser target_n au total
-  mu_par_parent <- target_n / current_parents$n
-  
-  for(i in 1:current_parents$n) {
-    n_kids <- rpois(1, mu_par_parent)
-    if(n_kids > 0) {
-      year_children_x <- c(year_children_x, rnorm(n_kids, current_parents$x[i], sd_dispersion_enfant))
-      year_children_y <- c(year_children_y, rnorm(n_kids, current_parents$y[i], sd_dispersion_enfant))
+  new_parents <- na.omit(new_parents)
+
+  inside <- spatstat.geom::inside.owin(
+    new_parents$x,
+    new_parents$y,
+    window
+  )
+
+  new_parents <- new_parents[inside, , drop = FALSE]
+
+  return(new_parents)
+}
+```
+
+### Neyman-Scott --> generation des points enfants autour des parents
+
+```{r}
+simulate_children_thomas <- function(parents, mu = 10, sigma = 2, window){
+
+  if(nrow(parents) == 0) return(data.frame())
+
+  children_list <- lapply(1:nrow(parents), function(i){
+
+    n_child <- rpois(1, mu)
+
+    if(n_child == 0) return(NULL)
+
+    data.frame(
+      x = rnorm(n_child, parents$x[i], sigma),
+      y = rnorm(n_child, parents$y[i], sigma)
+    )
+  })
+
+  children <- dplyr::bind_rows(children_list)
+
+  if(nrow(children) == 0) return(children)
+
+  children <- na.omit(children)
+
+  inside <- spatstat.geom::inside.owin(
+    children$x,
+    children$y,
+    window
+  )
+
+  children <- children[inside, , drop = FALSE]
+
+  return(children)
+}
+```
+
+### Simulation sur plusieurs annees
+
+```{r}
+simulate_population <- function(
+  n_years = 7,
+  initial_parents,
+  sd_move = 4,
+  mu = 10,
+  sigma = 2,
+  window
+){
+
+  parents <- initial_parents
+  results <- list()
+
+  for(year in 1:n_years){
+
+    children <- simulate_children_thomas(
+      parents,
+      mu = mu,
+      sigma = sigma,
+      window = window
+    )
+
+    if(nrow(children) > 0){
+      children$year <- year
+      results[[year]] <- children
+    }
+
+    parents <- simulate_parents(
+      parents,
+      sd_move = sd_move,
+      window = window
+    )
+
+    if(nrow(parents) == 0){
+      message("Plus de parents à l'année ", year)
+      break
     }
   }
-  
-  # C. Filtrage par zone (Suède/Norvège)
-  temp_df <- data.frame(x = year_children_x, y = year_children_y, year = t)
-  temp_sf <- st_as_sf(temp_df, coords = c("x", "y"), crs = st_crs(zone_union))
-  
-  inside <- st_within(temp_sf, zone_union, sparse = FALSE)
-  valid_children <- temp_df[as.vector(inside), ]
-  
-  # D. Échantillonnage pour avoir exactement target_n si possible
-  if(nrow(valid_children) >= target_n) {
-    valid_children <- valid_children[sample(1:nrow(valid_children), target_n), ]
-  }
-  
-  df_all_years <- rbind(df_all_years, valid_children)
+
+  dplyr::bind_rows(results)
 }
+```
+
+### Initialisation des parents au temps 1
+
+```{r}
+initial_parents <- data.frame(
+  x = runif(15, 0, 100),
+  y = runif(15, 0, 100)
+)
+```
+
+### donnees simulees
+
+```{r}
+pop_data <- simulate_population(
+  n_years = 7,
+  initial_parents = initial_parents,
+  sd_move = 5,
+  mu = 12,
+  sigma = 3,
+  window = window_thomas
+)
+
+pop_sf <- st_as_sf(
+  pop_data,
+  coords = c("x","y"),
+  crs = st_crs(zone)
+)
+```
+
+### représentation graphique
+
+```{r}
+ggplot() +
+
+  geom_sf(data = zone_union, fill = "grey95", color = "black") +
+
+  stat_density_2d(
+    data = pop_data,
+    aes(x, y, fill = after_stat(density)),
+    geom = "raster",
+    contour = FALSE,
+    alpha = 0.8
+  ) +
+
+  scale_fill_viridis_c() +
+
+  coord_sf() +
+
+  facet_wrap(~year) +
+
+  labs(
+    title = "Densité de population simulée (Processus de Thomas)",
+    fill = "Densité"
+  ) +
+
+  theme_minimal()
 ```
 

@@ -9,7 +9,15 @@ library(sf)
 library(dplyr)
 library(ggplot2)
 library(gtools)
+library(nimble)
+library(raster) 
 ```
+```{r}
+load("~/work/PFE_WildThings/ScriptAndDataMCMC/Wolverine/22.J_Fa1.RData")
+source("~/work/PFE_WildThings/ScriptAndDataMCMC/Wolverine/dbin_LESS_Cached_MultipleCovResponse.R")
+source("~/work/PFE_WildThings/ScriptAndDataMCMC/Wolverine/pointProcess.R")
+```
+
 
 # nimConstants
 ```{r}
@@ -270,8 +278,11 @@ for (j in 1:nrow(isAlive)) {
 ```
 ## trials
 ```{r}
-# trials should be a VECTOR (one value per detector, constant across years)
 trials <- rep(10, simul.nimConstants$n.detectors)
+nimData$trials
+length(nimData$trials)
+length(trials)
+# nb de visite a chaque detector.
 ```
 
 ## les detections : y.alive
@@ -335,12 +346,17 @@ for(i in 1:simul.nimConstants$n.individuals) {
 ## nbDetections
 
 ```{r}
+head(nimData$nbDetections)
+dim(nimData$nbDetections)
 nbDetections <- apply(simul.y.alive, 1, sum)
 ```
 
 ## detResponse
 ```{r}
 detResponse <- simul.y.alive > 0
+dim(nimData$detResponse) # nb individu x nb années
+class(nimData$detResponse)
+head(nimData$detResponse) # oui / non
 ```
 
 ## Regroupement de tout

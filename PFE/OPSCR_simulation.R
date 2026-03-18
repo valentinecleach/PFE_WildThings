@@ -48,8 +48,6 @@ library(nimbleSCR)
 library(rovquantR)
 library(basicMCMCplots)
 
-
-
 ##------------------------------------------------------------------------------
 
 ## ------ I. SIMULATION SET-UP ------
@@ -82,102 +80,104 @@ detectors = list( resolution.sub = 2000, # resolution des sous-detecteurs (2km)
 
 ##-- Load pre-defined habitat rasters and shapefiles of Scandinavia
 data("REGIONS", envir = environment()) # objet spatial des regions scandinaves
-data("habitatRasters", envir = environment()) #
+data("habitatRasters", envir = environment()) # rasters d'habitat prédéfinis (??)
 
 ##-- Select a county to simulate data
 ##-- Here, we use Norrbotten county in Sweden
-habitat$studyArea <- REGIONS %>%
-  filter(county == "Norrbotten") %>%
-  sf::st_union() %>%
-  sf::st_as_sf()
+habitat$studyArea <- REGIONS %>% # dans les regions
+  filter(county == "Norrbotten") %>% # Suède
+  sf::st_union() %>% # fusion des polygones
+  sf::st_as_sf() # objet spatial
 
 ##-- Disaggregate predefined habitat raster to the desired resolution
-habRaster <- raster::disaggregate(
-  x = habitatRasters[["Habitat"]],
+# raster = ensemble de pixels
+habRaster <- raster::disaggregate( # augmente la resolution du raster
+  x = habitatRasters[["Habitat"]], # raster d'habitat d'origine
   fact = raster::res(habitatRasters[["Habitat"]])/habitat$resolution)
+# facteur de division pour nouvelle resolution
 
 ##-- Make habitat from predefined Scandinavian raster of suitable habitat
-habitat <- makeHabitatFromRaster(
-  poly = habitat$studyArea,
-  habitat.r = habitatRasters[["Habitat"]],
-  buffer = habitat$buffer,
-  plot.check = FALSE) %>%
-  append(habitat,.)
+habitat <- makeHabitatFromRaster( # transforme un raster en habitat exploitable
+  poly = habitat$studyArea, # recup zone d'etude
+  habitat.r = habitatRasters[["Habitat"]], # recup raster d'habitat
+  buffer = habitat$buffer, # recup zone tampon
+  plot.check = FALSE) %>% # pas d'affichage de la figure
+  append(habitat,.) # ajout l'objet a habitat
 
 ##-- Retrieve number of habitat windows 
-isHab <- habitat$habitat.r[] == 1
-habitat$n.habwindows <- sum(isHab)
+isHab <- habitat$habitat.r[] == 1 # id pixels qui sont habitat
+habitat$n.habwindows <- sum(isHab) # nb total de cellule habitat
 
 ##-- Get coordinates of habitat windows
 habitat$habitat.df <- cbind.data.frame(
-  "id" = 1:habitat$n.habwindows,
-  "x" = raster::coordinates(habitat$habitat.r)[isHab,1],
+  "id" = 1:habitat$n.habwindows, # identifiant unique pour les cellules habitat
+  "x" = raster::coordinates(habitat$habitat.r)[isHab,1], # coordonnes centres cellules
   "y" = raster::coordinates(habitat$habitat.r)[isHab,2])
 
 ##-- Make a spatial grid from polygon
-habitat$grid <- raster::rasterToPolygons(
+habitat$grid <- raster::rasterToPolygons( # conversion raster en polygones spatiaux
   habitat$habitat.r,
   fun = function(x){x>0}) %>%
   sf::st_as_sf() %>%
-  mutate(id = 1:nrow(.))
+  mutate(id = 1:nrow(.)) # ajout id a chaque cellule
 
 ##-- Generate a random covariate
-habitat$covariate <- rnorm(habitat$n.habwindows)
+habitat$covariate <- rnorm(habitat$n.habwindows) # genre covar environ al
 
 
 
 ## ------     3. SET-UP DETECTORS ------
 
 ##-- Generate raster of sub-detectors based on the study area
-detectors$subdetectors.r <- raster::disaggregate(
-  x = habitat$habitat.rWthBuffer,
-  fact = raster::res(habitat$habitat.r)[1]/detectors$resolution.sub)
+detectors$subdetectors.r <- raster::disaggregate( # raster de sous-detecteurs
+  x = habitat$habitat.rWthBuffer, # raster d'habitat avec buffer autour de la zone
+  fact = raster::res(habitat$habitat.r)[1]/detectors$resolution.sub) # subdivision
 
 ##-- Generate NGS detectors based on the raster of sub-detectors
-detectors <- makeSearchGrid( 
-  data = detectors$subdetectors.r,
-  resolution = detectors$detResolution,
-  div = (detectors$resolution/detectors$resolution.sub)^2,
-  plot = FALSE) %>%
-  append(detectors,.)
+detectors <- makeSearchGrid( # réseau de détecteurs spatiaux
+  data = detectors$subdetectors.r, # raster de base utilisé pour placer les detecteurs
+  resolution = detectors$detResolution, # distance entre detecteurs
+  div = (detectors$resolution/detectors$resolution.sub)^2, # nb de sous-cell dans une cell principale
+  plot = FALSE) %>% 
+  append(detectors,.) # ajout à la liste detectors
 
 ##-- Extract numbers of detectors
-detectors$n.detectors <- nrow(detectors$main.detector.sp)
+detectors$n.detectors <- nrow(detectors$main.detector.sp) # nb total de detecteurs
 
 ##-- Format detector locations & number of trials per detector
-detectors$detectors.df <- cbind.data.frame(
-  "id" = 1:detectors$n.detectors,
-  "x" = sf::st_coordinates(detectors$main.detector.sp)[ ,1],
-  "y" = sf::st_coordinates(detectors$main.detector.sp)[ ,2],
-  "size" = as.vector(table(detectors$detector.sp$main.cell.id)))
+detectors$detectors.df <- cbind.data.frame( # dataframe des detecteurs
+  "id" = 1:detectors$n.detectors, # id unique pour chaque detect
+  "x" = sf::st_coordinates(detectors$main.detector.sp)[ ,1], # coord x du detect
+  "y" = sf::st_coordinates(detectors$main.detector.sp)[ ,2], # coord y
+  "size" = as.vector(table(detectors$detector.sp$main.cell.id))) # nb de ss-detect dans chaque detect principal
 
 ##-- Make a spatial grid from polygon
-detectors$grid <- raster::rasterToPolygons(
-  x = raster::aggregate( x = detectors$subdetectors.r,
-                         fact = detectors$resolution/detectors$resolution.sub),
-  fun = function(x){x>0}) %>%
-  sf::st_as_sf() %>%
-  mutate(id = 1:nrow(.))
+detectors$grid <- raster::rasterToPolygons( # convertion raster en polygone
+  x = raster::aggregate( x = detectors$subdetectors.r, # aggregation des ss-detect
+                         fact = detectors$resolution/detectors$resolution.sub), # nb tot de ss-cell à regr
+  fun = function(x){x>0}) %>% # garder les cellules actives
+  sf::st_as_sf() %>% # modif en objet spatial
+  mutate(id = 1:nrow(.)) # ajout id a chaque cell
 
 
 
 ## ------     4. RESCALE COORDINATES ------
 
 ##-- Rescale coordinates
-scaledObjects <- scaleCoordsToHabitatGrid(
-  coordsData = detectors$detectors.df[ ,c("x","y")],
-  coordsHabitatGridCenter = habitat$habitat.df[ ,c("x","y")])
+scaledObjects <- scaleCoordsToHabitatGrid( # toutes les coord dans meme syst d'echelle
+  coordsData = detectors$detectors.df[ ,c("x","y")], # coord detecteurs
+  coordsHabitatGridCenter = habitat$habitat.df[ ,c("x","y")]) # corrdonnes centres cell habitat
 
 ##-- Get lower and upper habitat cell coordinates
-habitat$lowerHabCoords <- scaledObjects$coordsHabitatGridCenterScaled - 0.5
-habitat$upperHabCoords <- scaledObjects$coordsHabitatGridCenterScaled + 0.5
+habitat$lowerHabCoords <- scaledObjects$coordsHabitatGridCenterScaled - 0.5 # coord coin inf cell hab
+habitat$upperHabCoords <- scaledObjects$coordsHabitatGridCenterScaled + 0.5 # coord coin sup cell hab
 
 ##-- Get local objects
-localDetectors <- getLocalObjects( 
-  habitatMask = habitat$habitat.mx,
-  coords = scaledObjects$coordsDataScaled,
-  dmax = detectors$maxDist/habitat$resolution,
-  resizeFactor = 1,
+localDetectors <- getLocalObjects( # optimiser calculs SCR (id detecteurs proches de chaque cell)
+  habitatMask = habitat$habitat.mx, # matrice hab
+  coords = scaledObjects$coordsDataScaled, # coord detect mises à l'echelle
+  dmax = detectors$maxDist/habitat$resolution, # distance maximale de detection
+  resizeFactor = 1, # facteur d'echelle
   plot.check = TRUE)
 
 
@@ -188,22 +188,21 @@ localDetectors <- getLocalObjects(
 
 ## ------     1. DEFINE MODEL CODE ------
 
-modelCode <- nimbleCode({
+modelCode <- nimbleCode({ # modele probabiliste nimble
   
   ##------ SPATIAL PROCESS ------##  
   
   ## Standard deviation of movement distribution
-  tau ~ dgamma(0.001, 0.001)
-  
+  tau ~ dgamma(0.001, 0.001) # prior dispersion du mouvement (distrib gamma)
   
   ## Intensity of movement point process
-  betaHab ~ dnorm(0,0.01)
-  logHabIntensity[1:n.habwindows] <- betaHab * habCov[1:n.habwindows]
-  habIntensity[1:n.habwindows] <- exp(logHabIntensity[1:n.habwindows])
-  logSumIntensity <- log(sum(habIntensity[1:n.habwindows]))
+  betaHab ~ dnorm(0,0.01) # prior effet de la covar habitat
+  logHabIntensity[1:n.habwindows] <- betaHab * habCov[1:n.habwindows] # intensite spatiale (depend covar habitat)
+  habIntensity[1:n.habwindows] <- exp(logHabIntensity[1:n.habwindows]) # transformation exponentielle
+  logSumIntensity <- log(sum(habIntensity[1:n.habwindows])) # normalisation du processus spatial
   
   ## FIRST YEAR 
-  for(i in 1:M){
+  for(i in 1:M){ # pour chaque indiv
     s[i, 1:2,1] ~ dbernppAC(
       lowerCoords = lowerHabCoords[1:n.habwindows,1:2],
       upperCoords = upperHabCoords[1:n.habwindows,1:2],
@@ -211,11 +210,11 @@ modelCode <- nimbleCode({
       logSumIntensity = logSumIntensity,
       habitatGrid = habitatGrid[1:y.max,1:x.max],
       numGridRows = y.max,
-      numGridCols = x.max)
+      numGridCols = x.max) # localisation du CA la premiere annee
     
     ## T > 1 
-    for(t in 2:n.years){
-      s[i,1:2,t] ~ dbernppACmovement_normal(
+    for(t in 2:n.years){ # boucle temporelle
+      s[i,1:2,t] ~ dbernppACmovement_normal( # modele de mouvement spatial des indiv
         lowerCoords = lowerHabCoords[1:n.habwindows,1:2],
         upperCoords = upperHabCoords[1:n.habwindows,1:2],
         s = s[i,1:2,t-1],
@@ -233,17 +232,17 @@ modelCode <- nimbleCode({
   ##----- DEMOGRAPHIC PROCESS -----## 
   
   ## Initial inclusion prob.
-  psi ~ dunif(0,1)   
+  psi ~ dunif(0,1) # proba init d'inclusion (alive)
   
   ## Initial state prob. vector
-  omeg1[1:3] <- c(1-psi,psi,0)                                                 
+  omeg1[1:3] <- c(1-psi,psi,0) # proba init des etats
   
-  for(t in 1:(n.years-1)){
+  for(t in 1:(n.years-1)){ # chaque annee
     ## Survival prob.
-    phi[t] ~ dunif(0,1)      
+    phi[t] ~ dunif(0,1) # proba de survie
     
     ## Recruitment prob.
-    gamma[t] ~ dunif(0,1)
+    gamma[t] ~ dunif(0,1) # proba de recrutement
     
     ## Transition matrix
     omega[1,1:3,t] <- c(1-gamma[t],gamma[t],0)
@@ -255,10 +254,10 @@ modelCode <- nimbleCode({
   ## z = 1 ==> not yet alive (unborn)
   ## z = 2 ==> alive
   ## z = 3 ==> dead
-  for(i in 1:M){
-    z[i,1] ~ dcat(omeg1[1:3])
-    for(t in 1:(n.years-1)){
-      z[i,t+1] ~ dcat(omega[z[i,t],1:3,t])
+  for(i in 1:M){ # pour chaque indiv
+    z[i,1] ~ dcat(omeg1[1:3]) # etat init
+    for(t in 1:(n.years-1)){ # temps d'apres
+      z[i,t+1] ~ dcat(omega[z[i,t],1:3,t]) # transition entre etats (modele de Markov)
     }#t
   }#i
   
@@ -269,20 +268,21 @@ modelCode <- nimbleCode({
   ## Scale parameter of the detection function
   ## Note that all spatial parameters are relative to the habitat resolution
   ## e.g. here, a scale parameter of 5 corresponds to 5*20 = 100km
-  sigma ~ dunif(0,10)
+  sigma ~ dunif(0,10) # param spatial de la detection
   
-  for(t in 1:n.years){
+  for(t in 1:n.years){ # chaque annee
     
     ## Annual baseline detection prob.
-    p0[t] ~ dunif(0,1)
+    p0[t] ~ dunif(0,1) # proba de detection de base
     
-    for (i in 1:M){
+    for (i in 1:M){ # chaque indiv
       
       ## Alive indicator
-      isAlive[i,t] <- (z[i,t] == 2) 
+      isAlive[i,t] <- (z[i,t] == 2) # indicatrice si etat alive
       
       ## Individual detections
       y[i, 1:lengthYCombined,t] ~ dbinomLocal_normal(
+        # modele de detection binomiale spatiale --> selon dist, detects proches, etat indiv
         size = size[1:n.detectors],
         p0 = p0[t],
         s = s[i,1:2,t],
@@ -297,7 +297,7 @@ modelCode <- nimbleCode({
     }#i
     
     ## Population size
-    N[t] <- sum(isAlive[1:M,t])
+    N[t] <- sum(isAlive[1:M,t]) # taille annuelle de la population
   }#t
   
 })
@@ -306,7 +306,7 @@ modelCode <- nimbleCode({
 
 ## ------     2. PREPARE LISTS OF DATA, CONSTANTS & INITIAL VALUES ------
 
-##-- Constants
+##-- Constants = constantes du modele
 simConstants <- list( M = data$M,
                       n.years = data$n.years,
                       n.detectors = detectors$n.detectors,                     
@@ -320,7 +320,7 @@ simConstants <- list( M = data$M,
                       lengthYCombined = localDetectors$numLocalIndicesMax * 2 + 1)
 
 
-##-- Data
+##-- Data = donnes observees (par simulation)
 simData <- list( detCoords = scaledObjects$coordsDataScaled,
                  size = detectors$detectors.df$size,
                  habCov = habitat$covariate,
@@ -329,7 +329,7 @@ simData <- list( detCoords = scaledObjects$coordsDataScaled,
                  habitatGrid = localDetectors$habitatGrid)
 
 
-##-- Initial Values
+##-- Initial Values = valeurs initiales des param
 simInits <- list( tau = data$tau,
                   betaHab = data$betaHab,
                   psi = data$psi,
@@ -348,10 +348,10 @@ simModel <- nimbleModel( code = modelCode,
                          data = simData,
                          inits = simInits,
                          check = F,       
-                         calculate = T)  
+                         calculate = T) # creation modele NIMBLE
 
 ##-- Identify nodes in the model to simulate
-nodesToSim <- simModel$getDependencies( c("tau","betaHab",
+nodesToSim <- simModel$getDependencies( c("tau","betaHab", # id variables a simuler
                                           "psi","gamma","phi",
                                           "p0","sigma"),
                                         self = FALSE,
@@ -359,10 +359,10 @@ nodesToSim <- simModel$getDependencies( c("tau","betaHab",
                                         returnScalarComponents = TRUE)
 
 ##-- Simulate those nodes 
-simModel$simulate(nodesToSim, includeData = FALSE)
+simModel$simulate(nodesToSim, includeData = FALSE) # generation donnes simulees
 
 ##-- Check the simulated population size
-N <- apply(simModel$z,2,function(x)sum(x==2))
+N <- apply(simModel$z,2,function(x)sum(x==2)) # calcul de la vraie taille de pop
 N
 
 
@@ -374,12 +374,12 @@ N
 ## ------     1. BUNDLE SIMULATED DATA ------
 
 ##-- Individual state matrix
-true.z <- z.data <- z.inits <- simModel$z
-whichDet <- simModel$y[ ,1, ] > 0
+true.z <- z.data <- z.inits <- simModel$z # etats reels des individus
+whichDet <- simModel$y[ ,1, ] > 0 # id indiv detectes
 
 ##-- Set state to NA in the data for individuals not detected
-z.data[!whichDet] <- NA
-z.inits[whichDet] <- NA
+z.data[!whichDet] <- NA # etat inconnus pour indiv non detectes
+z.inits[whichDet] <- NA # pas d'initialisation si detectes
 
 ##-- Constants
 nimConstants <- list( M = data$M,
@@ -428,7 +428,7 @@ model <- nimbleModel( code = modelCode,
                       inits = nimInits,
                       check = F,
                       calculate = F)
-cmodel <- compileNimble(model)
+cmodel <- compileNimble(model) # compilation en c++
 cmodel$calculate()
 MCMCconf <- configureMCMC(model = model,
                           monitors = c( "tau","betaHab",
@@ -438,15 +438,15 @@ MCMCconf <- configureMCMC(model = model,
                           monitors2 = c("s","z"),
                           control = list(reflective = TRUE),
                           thin = 1,
-                          thin2 = 10)
-MCMC <- buildMCMC(MCMCconf)   
-cMCMC <- compileNimble(MCMC, project = model, resetFunctions = TRUE) 
+                          thin2 = 10) # config du MCMC --> param a suivre, thinning, options
+MCMC <- buildMCMC(MCMCconf) # construction de l'algo MCMC
+cMCMC <- compileNimble(MCMC, project = model, resetFunctions = TRUE) # compile
 
 ##-- RUN THE MCMC (can take a long time)
-nimOutput <- runMCMC( mcmc = cMCMC,                 
+nimOutput <- runMCMC( mcmc = cMCMC, # execution MCMC
                       nburnin = 0,
-                      niter = 1000,
-                      nchains = 2,
+                      niter = 1000, # 1000 iterations
+                      nchains = 2, # 2 chaines
                       samplesAsCodaMCMC = TRUE)
 
 
@@ -458,13 +458,12 @@ nimOutput <- runMCMC( mcmc = cMCMC,
 ## Population size
 chainsPlot( nimOutput$samples,
             var = c("N[1]","N[2]","N[3]","N[4]","N[5]"),
-            line = N)
+            line = N) # pour verifier visuellement la convergence
 
 ## Other parameters
 chainsPlot( nimOutput$samples, 
             var = c("p0","sigma","psi","gamma","phi","tau"), 
             line = c(data$p0,data$sigma,data$psi,data$gamma,data$phi,data$tau))
-
-
+# graphiques pour les parametres
 
 ##------------------------------------------------------------------------------
